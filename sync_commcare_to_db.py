@@ -207,10 +207,14 @@ def main(
         if previous_column_state_path
         else os.path.join(
             os.path.dirname(os.path.realpath(__file__)),
-            "sync_commcare_assets",
+            "assets",
+            commcare_project_name,
             f"{filter_value}-column-state.json",
         )
     )
+    # Create parent directory for this commcare_project_name, if needed.
+    if not os.path.exists(os.path.dirname(state_path)):
+        os.makedirs(os.path.dirname(state_path))
     if os.path.exists(state_path):
         with open(state_path) as f:
             state = json.load(f)
@@ -246,8 +250,9 @@ def main(
         if wb_file_path
         else os.path.join(
             os.path.dirname(os.path.realpath(__file__)),
-            "sync_commcare_assets",
-            f"{filter_value}-source-target-mappings.xlsx",
+            "assets",
+            commcare_project_name,
+            f"{filter_value}-mappings.xlsx",
         )
     )
     if mapping_did_change or not os.path.exists(wb_file_path):

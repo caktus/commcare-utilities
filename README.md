@@ -2,14 +2,14 @@
 
 This script allows a user to export data from Commcare to a SQL database. It does by iterating over all records returned in an OData feed for a particular case type to build a list of all observed property names (whether current or deprecated) to be turned into column names in a SQL db. It then calls [`commcare-export`](https://github.com/dimagi/commcare-export) as a subprocess, attempting to all cases with all observed property names to the db.
 
-This script presently contains files in `sync_commcare_assets` to support syncing the following case types:
+This script presently contains files in `assets/<project-name>/` to support syncing the following case types:
 
 - contact
 - investigation
 - patient
 - lab_result
 
-If you need to add a new case type, create a file with a name of the form `<case-type>-column-state.json` in the `sync_commcare_assets` folder. Copy the contents of `template.json` from that same folder into the new file and save.
+If you need to add a new case type, simply run the script with that case type and new JSON state and Excel files will be created.
 
 ## Oddities
 
