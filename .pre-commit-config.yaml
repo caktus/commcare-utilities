@@ -1,7 +1,5 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
-# FIXME: include these directories in the commit hook, some day...
-exclude: '^(vpc-template|docs)/'
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v2.4.0
