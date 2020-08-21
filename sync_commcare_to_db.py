@@ -1,11 +1,11 @@
 import argparse
-from datetime import datetime
 import json
 import os
 import subprocess
+from datetime import datetime
 
-from openpyxl import Workbook
 import requests
+from openpyxl import Workbook
 
 
 def extract_property_names_from_case_data(
