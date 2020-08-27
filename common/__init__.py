@@ -11,7 +11,7 @@ def upload_data_to_commcare(
     data,
     project_slug,
     case_type,
-    match_column,
+    search_column,
     cc_username,
     cc_api_key,
     create_new_cases="on",
@@ -22,16 +22,16 @@ def upload_data_to_commcare(
     }
     fieldnames = data[0].keys()
     assert (
-        match_column in fieldnames
-    ), f"Data items must have an '{match_column}' property"
+        search_column in fieldnames
+    ), f"Data items must have property '{search_column}'"
     df = pd.DataFrame(data)
     files = {"file": (f"{case_type}.csv", df.to_csv(index=False))}
+    print(files)
     body = dict(
         case_type=case_type,
-        search_column=match_column,
-        search_field=match_column,
+        search_column=search_column,
+        search_field=search_column,
         create_new_cases=create_new_cases,
-        name_column="name",
     )
     response = requests.post(url, headers=headers, files=files, data=body)
     for line in response.text.splitlines():
@@ -40,7 +40,9 @@ def upload_data_to_commcare(
         seconds = 2
         print(f"Sleeping {seconds} seconds and checking upload status...")
         time.sleep(seconds)
-        response_ = requests.get(response.json()["status_url"], headers=headers)
+        response_ = requests.get(
+            response.json()["status_url"], headers=headers, timeout=10
+        )
         for line in response_.text.splitlines():
             print(line)
         if response_.json()["state"]["commcare_upload_state"] == "success":
