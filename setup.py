@@ -18,6 +18,6 @@ setup(
         "phonenumbers",
         "pandas",
     ],
-    scripts=["scripts"],
+    scripts=["scripts/lookup_contact_phone_numbers", "scripts/sync_commcare_to_db"],
     zip_safe=False,
 )
