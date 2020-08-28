@@ -5,3 +5,7 @@ venv
 .vscode
 assets
 __pycache__
+logs
+.pyc
+/dist/
+/*.egg-info
