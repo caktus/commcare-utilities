@@ -1,86 +1,82 @@
 import argparse
-import json
-import os
-import subprocess
-from datetime import datetime
+import re
+from collections import defaultdict
 
-import requests
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
+
+VALID_XML_ENTITY = re.compile(r"\w+")
 
 
-def extract_property_names_from_case_data(
-    feed_url, commcare_user_name, commcare_api_key
-):
+def extract_property_names(case_summary_file, case_types):
     """Get unique property names that appear in OData feed JSON objects
-
     This function iterates over each case data item in the feed
     and gathers unique property names.
-
     Args:
-        feed_url (str): URL of Commcare data feed to retrieve
-        commcare_user_name (str): Email address associated with commcare
-        commcare_api_key (str): API keyfor the email address
-
+        case_summary_file (str): File path to CommCare app case summary
+        case_types (str): Case type to extract from the file
     Returns:
-        list: List of strings of property names
+        iterator: Iterator of strings of property names
     """
-    response = requests.get(feed_url, auth=(commcare_user_name, commcare_api_key))
-    cases = response.json()["value"]
-    property_names = set()
-    for case in cases:
-        property_names.update(set(case.keys()))
-    return list(property_names)
+    wb = load_workbook(filename=case_summary_file)
+    # iterate through columns A & B, by row
+    rows = zip(*wb["All Case Properties"]["A:B"])
+    # read the first (header) row
+    header_a, header_b = next(rows)
+    assert header_a.value == "case_type"
+    assert header_b.value == "case_property"
+    # read the remaining rows, filtering out any case types we're not looking for
+    # and case properties that are not valid XML entities (they are likely
+    # "calculated properties" without a property name in the CommCare app)
+    properties_by_type = defaultdict(list)
+    for case_type, case_property in rows:
+        case_type = case_type.value.strip()
+        case_property = case_property.value.strip()
+        if case_type in case_types and VALID_XML_ENTITY.fullmatch(case_property):
+            properties_by_type[case_type].append(case_property)
+    return properties_by_type
 
 
-def get_unseen_property_names(old_names, new_names):
-    """Get list of previously unseen property names
-
-    Args:
-        old_names (list): List of previously seen property names
-        new_names (list): List of property names from new data
-
-    Returns:
-        list: List of strings of new property names
-    """
-    harmonized_old_names = [item.split("properties.")[-1] for item in old_names]
-    return list(set(new_names).difference(set(harmonized_old_names)))
-
-
-def get_source_and_target_mapping(source_column_name):
-    """Map source column name to target column name.
-    """
-
-    # The case ID field is special and is mapped to an "id" column in the SQL
-    # database, which will be used as the primary key.
-    if source_column_name in ("caseid", "case_id"):
-        return (source_column_name, "id")
-    # The "closed" attribute doesn't seem to be a "property" as far as CommCare is
-    # concerned, but rather, a common attribute on all cases. (There may be others,
-    # but we haven't found them yet.)
-    if source_column_name == "closed":
-        return (source_column_name, source_column_name)
-    # All other field names are assumed to be "properties" in CommCare and need to be
-    # prefixed with "properties.".
-    return (f"properties.{source_column_name}", source_column_name)
-
-
-def generate_source_target_mappings(
-    source_columns, transform_function=get_source_and_target_mapping
-):
+def generate_source_target_mappings(source_columns):
     """Generate mapping of source column names to target column names for db
 
     Args:
         source_columns (list): List of source column names
-        transform_function (fn): Function to apply to each source column name to
-            derive target column name. Defaults to `transform_source_to_target`.
 
     Returns:
         list: List of tuples where item[0] is source name, and item[1] is target name
     """
-    return [transform_function(source_col) for source_col in sorted(source_columns)]
+    # For some reason, the same values have different labels in different places in CommCare.
+    # this maps the case fields to the OData field names that the user is expecting. This
+    # list is taken from running a Case Data API query for a single case and removing any
+    # field names that start with "properties" or "xforms". The properties come in via
+    # source_columns, and I'm not sure what the xforms are.
+    # https://confluence.dimagi.com/display/commcarepublic/Case+Data
+    static_case_fields = [
+        "case_id",
+        "closed",
+        "closed_by",
+        "date_closed",
+        "date_modified",
+        "domain",
+        "id",
+        "indexed_on",
+        "indices.parent.case_id",
+        "indices.parent.case_type",
+        "indices.parent.relationship",
+        "opened_by",
+        "resource_uri",
+        "server_date_modified",
+        "server_date_opened",
+        "user_id",
+    ]
+    return [(source_col, source_col) for source_col in static_case_fields] + [
+        (f"properties.{source_col}", source_col)
+        for source_col in sorted(source_columns)
+        if source_col not in static_case_fields
+    ]
 
 
-def make_commcare_export_sync_xl_wb(source_target_mappings, filter_value):
+def make_commcare_export_sync_xl_wb(mapping):
     """Create an Excel workbook in format required for commcare-export script
 
     NB: This does not save the workbook, and will need to call wb.save() on object
@@ -88,10 +84,8 @@ def make_commcare_export_sync_xl_wb(source_target_mappings, filter_value):
 
 
     Args:
-        source_target_mappings (list): List of tuples of form
-            ("source_name", "target_name)
-        filter_value (str): This is the case type, and gets added as the "Filter value"
-            in the workbook, as well as the worksheet name.
+        mapping (dict): Dictionary of lists of tuples of form
+            {"case_type": [("source_name", "target_name)]}
 
     Returns:
         obj: An Openpyxl workbook
@@ -103,185 +97,59 @@ def make_commcare_export_sync_xl_wb(source_target_mappings, filter_value):
         "",
         "Field",
         "Source Field",
-        "Alternate Source Field 1",
     ]
     wb = Workbook()
-    ws = wb.active
-    ws.title = filter_value
-    ws.append(sheet_headers)
-    ws["A2"] = "case"
-    ws["B2"] = "type"
-    ws["C2"] = filter_value
+    for i, (case_type, source_target_mappings) in enumerate(mapping.items()):
+        if i == 0:
+            ws = wb.active
+            ws.title = case_type
+        else:
+            ws = wb.create_sheet(case_type)
+        ws.append(sheet_headers)
+        ws["A2"] = "case"
+        ws["B2"] = "type"
+        ws["C2"] = case_type
 
-    row_offset = 3
-    # this is the only column name that we need to list Alternate Source Field 1 for
-    # at the moment
-    ws["E2"], ws["F2"], ws["G2"] = ("id", "caseid", "case_id")
-
-    mappings = [
-        item for item in source_target_mappings if item[0] not in ("caseid", "case_id")
-    ]
-    for idx, item in enumerate(mappings):
-        row_num = idx + row_offset
-        ws[f"F{row_num}"], ws[f"E{row_num}"] = item
-
+        row_offset = 2
+        for idx, item in enumerate(source_target_mappings):
+            row_num = idx + row_offset
+            # NOTE: Columns F, E are not in the order they appear in Excel (E, F)
+            ws[f"F{row_num}"], ws[f"E{row_num}"] = item
     return wb
 
 
-def save_column_state(save_path, filter_value, mappings):
-    """Save the state of source-target column mappings in a JSON file
-
-    Args:
-        save_path (str): Path that the file will be saved to
-        filter_value (str): This is the commcare case type
-        mappings (list): List of tuples of form
-            ("source_name", "target_name)
-
-    Returns: No return, but saves json file to save_path
-    """
-    state = {
-        "filter_value": filter_value,
-        "column_mappings": mappings,
-        "as_of": datetime.now().strftime("%Y_%m_%d-%H_%M_%S"),
-    }
-    with open(save_path, "w") as f:
-        json.dump(state, f, sort_keys=True, indent=2)
-        # Add missing newline at end of file.
-        f.write("\n")
-
-
-def do_commcare_export_to_db(
-    database_url_string,
-    commcare_project_name,
-    wb_file_path,
-    commcare_user_name,
-    commcare_api_key,
-):
-    """Run `commcare-export` as subprocess to export data to SQL db
-
-    Args:
-        database_url_string (str): Full db url to export to
-        commcare_project_name (str): The Commcare project being exported from
-        wb_file_path (str): Where the workbook with source-column mappings lives
-        commcare_user_name (str): The Commcare username (email address)
-        commcare_api_key (str): A Commcare API key for the user
-    """
-    commands = (
-        f"commcare-export --output-format sql "
-        f"--output {database_url_string} --project {commcare_project_name} "
-        f"--query {wb_file_path} --username {commcare_user_name} "
-        f"--auth-mode apikey --password {commcare_api_key}"
-    ).split(" ")
-    subprocess.run(commands)
-
-
-def main(
-    feed_url,
-    filter_value,
-    database_url_string,
-    commcare_user_name,
-    commcare_api_key,
-    commcare_project_name,
-    previous_column_state_path=None,
-    wb_file_path=None,
-):
+def main(case_summary_file, case_types, output_file_path):
     """Do everything required to export and report on commcare export
-
     Args:
-        feed_url (str): URL of Commcare OData feed
-        filter_value (str): The type of case (i.e, "contact", "lab_result, etc.)
-        database_url_string (str): Full db url to export to
-        commcare_user_name (str): The Commcare username (email address)
-        commcare_api_key (str): A Commcare API key for the user
-        commcare_project_name (str): The Commcare project being exported from
-        previous_column_state_path (str): the path to a previous column state report
-        wb_file_path (str): Where the workbook with source-column mappings lives
-
+        case_summary_file (str): File path to CommCare app case summary
+        case_types (list): The case types (i.e, "contact", "lab_result, etc.)
+        output_file_path (str): Where the workbook with source-column mappings lives
     """
-    print(f"Retrieving data from {feed_url} and extracting column names")
-    column_names = extract_property_names_from_case_data(
-        feed_url, commcare_user_name, commcare_api_key
-    )
-    state_path = (
-        previous_column_state_path
-        if previous_column_state_path
-        else os.path.join(
-            os.path.dirname(os.path.realpath(__file__)),
-            "assets",
-            commcare_project_name,
-            f"{filter_value}-column-state.json",
-        )
-    )
-    # Create parent directory for this commcare_project_name, if needed.
-    if not os.path.exists(os.path.dirname(state_path)):
-        os.makedirs(os.path.dirname(state_path))
-    if os.path.exists(state_path):
-        with open(state_path) as f:
-            state = json.load(f)
-            previous_mapping = [
-                # json will read these as lists, but they need to be tuples for
-                # hashing / comparison purposes later on (this is also how the
-                # mapping is generated by get_source_and_target_mapping()).
-                tuple(x)
-                for x in state["column_mappings"]
-            ]
-            previously_seen_columns = [
-                # Ensure we don't recursively prepend "properties." every time the
-                # script is run.
-                item[0].split("properties.")[-1]
-                for item in state["column_mappings"]
-            ]
-    else:
-        # Allow state files to be re-generated if needed.
-        previous_mapping = []
-        previously_seen_columns = []
-    new = get_unseen_property_names(previously_seen_columns, column_names)
-    new_set = set(new)
-    new_set.update(set(previously_seen_columns))
+    print(f"Retrieving data from {case_summary_file} and extracting column names")
+    properties_by_type = extract_property_names(case_summary_file, case_types)
 
-    new_mapping = generate_source_target_mappings(list(new_set))
-    mapping_did_change = set(previous_mapping) != set(new_mapping)
-    if mapping_did_change:
-        print(f"Saving new column state in the directory: {state_path}")
-        save_column_state(state_path, filter_value, new_mapping)
+    mapping = {
+        case_type: generate_source_target_mappings(properties)
+        for case_type, properties in properties_by_type.items()
+    }
 
-    wb_file_path = (
-        wb_file_path
-        if wb_file_path
-        else os.path.join(
-            os.path.dirname(os.path.realpath(__file__)),
-            "assets",
-            commcare_project_name,
-            f"{filter_value}-mappings.xlsx",
-        )
-    )
-    if mapping_did_change or not os.path.exists(wb_file_path):
-        print(
-            f"Generating a temporary Excel workbook for {filter_value} "
-            f"to the directory {wb_file_path}"
-        )
-        wb = make_commcare_export_sync_xl_wb(new_mapping, filter_value)
-        wb.save(wb_file_path)
-
-    print(f"Syncing data from Commcare to db at {database_url_string}")
-    do_commcare_export_to_db(
-        database_url_string,
-        commcare_project_name,
-        wb_file_path,
-        commcare_user_name,
-        commcare_api_key,
-    )
+    print(f"Generating a temporary Excel workbook to {output_file_path}")
+    wb = make_commcare_export_sync_xl_wb(mapping)
+    wb.save(output_file_path)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--feed-url", help="URL of Commcare OData feed", dest="feed_url"
+        "--case-summary-file",
+        help="File path to CommCare app case summary",
+        dest="case_summary_file",
     )
     parser.add_argument(
-        "--case-type",
-        help='The type of case (i.e, "contact", "lab_result, etc.)',
-        dest="filter_value",
+        "--case-types",
+        help='Space-separated list case types (e.g., "patient lab_result contact investigation")',
+        dest="case_types",
+        nargs="+",
     )
     parser.add_argument(
         "--db",
@@ -289,26 +157,11 @@ if __name__ == "__main__":
         dest="database_url_string",
     )
     parser.add_argument(
-        "--username",
-        help="The Commcare username (email address)",
-        dest="commcare_user_name",
-    )
-    parser.add_argument("--apikey", help="A Commcare API key", dest="commcare_api_key")
-    parser.add_argument(
-        "--project", help="The Commcare project name", dest="commcare_project_name"
-    )
-    parser.add_argument(
-        "--previous-report",
-        help="The path to a previous column state report",
-        dest="previous_column_state_path",
+        "--output",
+        help="The file path to the Excel query file output that will be created",
+        dest="output_file_path",
     )
     args = parser.parse_args()
     main(
-        args.feed_url,
-        args.filter_value,
-        args.database_url_string,
-        args.commcare_user_name,
-        args.commcare_api_key,
-        args.commcare_project_name,
-        args.previous_column_state_path,
+        args.case_summary_file, args.case_types, args.output_file_path,
     )
