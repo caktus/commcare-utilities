@@ -39,10 +39,9 @@ def get_unprocessed_contact_phone_numbers(db_url, search_column):
     """
     """
     engine = create_engine(db_url)
-    # temporarily have `AND TRUE` as placeholder for whatever field will contain
-    # SMSable info. We'll want to filter out rows that have this value empty/null
-    # and refer to that property by string substituting
-    # COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME defined at top of file
+    # temporarily have `AND TRUE` as placeholder
+    # COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME defined at top of file. currently
+    # this column not making way into test DB so can't include in query here.
     query = f"""
         SELECT {search_column}, contact_phone_number FROM contact
         WHERE

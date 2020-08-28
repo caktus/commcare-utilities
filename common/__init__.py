@@ -16,7 +16,7 @@ def upload_data_to_commcare(
     cc_username,
     cc_api_key,
     create_new_cases="on",
-    search_field="external_id",
+    search_field="case_id",
 ):
     url = BULK_UPLOAD_URL.format(project_slug)
     headers = {
