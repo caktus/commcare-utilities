@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+from pathlib import Path
 import subprocess
 from datetime import datetime
 
@@ -205,17 +206,15 @@ def main(
     state_path = (
         previous_column_state_path
         if previous_column_state_path
-        else os.path.join(
-            os.path.dirname(os.path.realpath(__file__)),
-            "assets",
-            commcare_project_name,
-            f"{filter_value}-column-state.json",
+        else Path(__file__)
+        .parent.absolute()
+        .joinpath(
+            "..", "assets", commcare_project_name, f"{filter_value}-column-state.json"
         )
     )
     # Create parent directory for this commcare_project_name, if needed.
-    if not os.path.exists(os.path.dirname(state_path)):
-        os.makedirs(os.path.dirname(state_path))
-    if os.path.exists(state_path):
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    if state_path.exists():
         with open(state_path) as f:
             state = json.load(f)
             previous_mapping = [
@@ -244,18 +243,17 @@ def main(
     if mapping_did_change:
         print(f"Saving new column state in the directory: {state_path}")
         save_column_state(state_path, filter_value, new_mapping)
-
     wb_file_path = (
         wb_file_path
         if wb_file_path
-        else os.path.join(
-            os.path.dirname(os.path.realpath(__file__)),
-            "assets",
-            commcare_project_name,
-            f"{filter_value}-mappings.xlsx",
+        else Path(__file__)
+        .parent.absolute()
+        .joinpath(
+            "..", "assets", commcare_project_name, f"{filter_value}-mappings.xlsx",
         )
     )
-    if mapping_did_change or not os.path.exists(wb_file_path):
+
+    if mapping_did_change or not wb_file_path.exists():
         print(
             f"Generating a temporary Excel workbook for {filter_value} "
             f"to the directory {wb_file_path}"
