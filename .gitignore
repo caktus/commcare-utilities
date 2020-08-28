@@ -4,3 +4,4 @@ venv
 .envrc
 .vscode
 assets
+__pycache__

@@ -8,8 +8,7 @@ from sqlalchemy import create_engine
 from common import upload_data_to_commcare
 
 TWILIO_LOOKUP_URL = "https://lookups.twilio.com/v1/PhoneNumbers"
-# NB update this when we hear back what is possible here
-COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME = "can_receive_sms"
+COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME = "contact_phone_can_receive_sms"
 
 
 def format_phone_number(raw, region="US"):
@@ -91,7 +90,7 @@ def main(
     processed_count = 0
     try:
         for idx, item in enumerate(data):
-            data[idx]["can_receive_sms"] = process_phone_number(
+            data[idx][COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = process_phone_number(
                 item["contact_phone_number"], twilio_sid, twilio_token,
             )
             processed_count += 1
@@ -104,7 +103,11 @@ def main(
                 f"processed so far to CommCare"
             )
     finally:
-        processed = [item for item in data if item["can_receive_sms"] is not None]
+        processed = [
+            item
+            for item in data
+            if item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] is not None
+        ]
         for item in processed:
             del item["contact_phone_number"]
         if processed:
