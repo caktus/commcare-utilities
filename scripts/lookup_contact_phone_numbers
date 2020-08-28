@@ -7,10 +7,20 @@ import phonenumbers
 import requests
 from sqlalchemy import create_engine
 
-from common import upload_data_to_commcare
+from common import logger, upload_data_to_commcare
 
 TWILIO_LOOKUP_URL = "https://lookups.twilio.com/v1/PhoneNumbers"
 COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME = "contact_phone_can_receive_sms"
+
+WHITE_LISTED_TWILIO_CODES = [
+    404,
+]
+
+
+class TwilioLookUpError(Exception):
+    def __init__(self, message, info):
+        super(TwilioLookUpError, self).__init__(message)
+        self.info = info
 
 
 def format_phone_number(raw, region="US"):
@@ -24,7 +34,18 @@ def twilio_lookup_phone_number(number, sid, auth_token):
         auth=(sid, auth_token),
         params={"Type": "carrier"},
     )
-    return response.json()["carrier"]["type"]
+    if response.ok:
+        return response.json()["carrier"]["type"]
+    elif response.status_code in WHITE_LISTED_TWILIO_CODES:
+        return None
+    else:
+        message = f"Something went wrong looking up number `{number}`."
+        info = {
+            "twilio_status_code": response.json().get("status_code"),
+            "twilio_error_code": response.json().get("code"),
+            "twilio_message": response.json().get("message"),
+        }
+        raise TwilioLookUpError(message, info)
 
 
 def can_receive_sms(number_type):
@@ -43,8 +64,7 @@ def process_phone_number(formatted_number, sid, auth_token):
 
 
 def get_unprocessed_contact_phone_numbers(db_url, search_column):
-    """
-    """
+    """"""
     engine = create_engine(db_url)
 
     # temporarily have `AND TRUE` as placeholder
@@ -79,47 +99,51 @@ def main(
         dict(item, **{COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME: None})
         for item in get_unprocessed_contact_phone_numbers(db_url, search_column)
     ]
-    _data = []
+    formatted = []
     for item in data:
         try:
             item["contact_phone_number"] = format_phone_number(
                 item["contact_phone_number"]
             )
-            _data.append(item)
+            formatted.append(item)
         except phonenumbers.NumberParseException:
-            print(
-                f"The number \"{item['contact_phone_number']}\" for contcact "
-                f"'{item[search_column]}' cannot be parsed and will not be further "
+            logger.warning(
+                f"The number `{item['contact_phone_number']}` for contcact "
+                f"`{item[search_column]}` cannot be parsed and will not be further "
                 f"processed."
             )
-    data = _data
-
-    processed_count = 0
+    twilio_processed = []
+    exit_status = 0
     try:
-        for idx, item in enumerate(data):
-            data[idx][COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = process_phone_number(
-                item["contact_phone_number"], twilio_sid, twilio_token,
+        for item in formatted:
+            processed = process_phone_number(
+                item["contact_phone_number"],
+                twilio_sid,
+                twilio_token,
             )
-            processed_count += 1
+            if processed:
+                item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = processed
+                twilio_processed.append(item)
+            else:
+                logger.warning(
+                    f"Phone number `{item['contact_phone_number']}` for contact with "
+                    f"ID {item['id']} could not be processed by Twilio. Moving on."
+                )
     except Exception as exc:
+        logger.error(f"Something unexpected happened: {exc.message}")
         exit_status = 1
-        print(f"Something went wrong: {exc}")
-        if processed_count > 0:
-            print(
-                f"Will attempt to upload the {processed_count} numbers successfully "
-                f"processed so far to CommCare"
-            )
     finally:
-        processed = [
-            item
-            for item in data
-            if item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] is not None
-        ]
-        for item in processed:
-            del item["contact_phone_number"]
-        if processed:
+        if twilio_processed:
+            logger.info(
+                f"Will attempt to upload the {len(twilio_processed)} numbers "
+                f"successfully processed by Twilio to CommCare."
+            )
+            # prep for export. contact_phone_number is already in db and we don't need
+            # to send it again.
+            for item in twilio_processed:
+                del item["contact_phone_number"]
             upload_data_to_commcare(
-                processed,
+                twilio_processed,
                 commcare_project_name,
                 "contact",
                 search_column,

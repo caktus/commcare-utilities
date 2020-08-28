@@ -3,9 +3,16 @@ import time
 import pandas as pd
 import requests
 
+from .logger import logger
 
 BULK_UPLOAD_URL = "https://www.commcarehq.org/a/{}/importer/excel/bulk_upload_api/"
 COMMCARE_UPLOAD_STATES = dict(missing=-1, not_started=0, started=1, success=2, failed=3)
+
+
+class CommCareUtilitiesError(Exception):
+    def __init__(self, message, info):
+        super(CommCareUtilitiesError, self).__init__(message)
+        self.info = info
 
 
 def upload_data_to_commcare(
@@ -44,15 +51,20 @@ def upload_data_to_commcare(
 
     response = requests.post(url, headers=headers, files=files, data=body, timeout=5)
     if not response.ok:
-        print(f"Something went wrong: {response.status_code}: {response.text}")
-        return
+        message = "Something went wrong uploading data to CommCare"
+        info = {
+            "commcare_response_status_code": response.status_code,
+            "commcare_response_text": response.text,
+        }
+        logger.error(message)
+        raise CommCareUtilitiesError(message, info)
     while True:
         seconds = 2
-        print(f"Sleeping {seconds} seconds and checking upload status...")
+        logger.info(f"Sleeping {seconds} seconds and checking upload status...")
         time.sleep(seconds)
         response_ = requests.get(
             response.json()["status_url"], headers=headers, timeout=2
         )
         if response_.json()["state"] == COMMCARE_UPLOAD_STATES["success"]:
-            print("Succesfully uploaded. All done")
+            logger.info("Succesfully uploaded. All done.")
             break

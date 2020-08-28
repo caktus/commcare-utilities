@@ -9,6 +9,8 @@ from datetime import datetime
 import requests
 from openpyxl import Workbook
 
+from common import logger
+
 
 def extract_property_names_from_case_data(
     feed_url, commcare_user_name, commcare_api_key
@@ -199,7 +201,7 @@ def main(
         wb_file_path (str): Where the workbook with source-column mappings lives
 
     """
-    print(f"Retrieving data from {feed_url} and extracting column names")
+    logger.info(f"Retrieving data from {feed_url} and extracting column names")
     column_names = extract_property_names_from_case_data(
         feed_url, commcare_user_name, commcare_api_key
     )
@@ -241,7 +243,7 @@ def main(
     new_mapping = generate_source_target_mappings(list(new_set))
     mapping_did_change = set(previous_mapping) != set(new_mapping)
     if mapping_did_change:
-        print(f"Saving new column state in the directory: {state_path}")
+        logger.info(f"Saving new column state in the directory: {state_path}")
         save_column_state(state_path, filter_value, new_mapping)
     wb_file_path = (
         wb_file_path
@@ -257,14 +259,14 @@ def main(
     )
 
     if mapping_did_change or not wb_file_path.exists():
-        print(
+        logger.info(
             f"Generating a temporary Excel workbook for {filter_value} "
             f"to the directory {wb_file_path}"
         )
         wb = make_commcare_export_sync_xl_wb(new_mapping, filter_value)
         wb.save(wb_file_path)
 
-    print(f"Syncing data from Commcare to db at {database_url_string}")
+    logger.info(f"Syncing data from Commcare to db at {database_url_string}")
     do_commcare_export_to_db(
         database_url_string,
         commcare_project_name,
