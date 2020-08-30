@@ -38,6 +38,8 @@ Note that this script does not update the database it originally queries.
 
 Also note that when this script encounters numbers that either a.) cannot be parsed to generate the standard format required by Twilio, or b.) are not found to be a valid number by the Twilio API, the script continues and logs a warning to a log file. It's on the user to relay information about such cases back to personel who can update the number in CommCare.
 
+Finally, note that this script presently is configured to work with US-based phone numbers and any non-US numbers it encounters will not yield information about SMS capability.
+
 **Running the script:**
 
 1. Create a Twilio account if you don't already have one.
