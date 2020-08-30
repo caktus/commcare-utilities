@@ -17,7 +17,6 @@ setup(
         "SQLAlchemy",
         "phonenumbers",
         "pandas",
-        "psycopg2"
     ],
     scripts=["scripts/lookup_contact_phone_numbers", "scripts/sync_commcare_to_db"],
     zip_safe=False,
