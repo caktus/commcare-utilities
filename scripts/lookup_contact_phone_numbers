@@ -121,7 +121,7 @@ def get_unprocessed_contact_phone_numbers(db_url, search_column="id"):
     ).where(and_(*wheres))
     conn = engine.connect()
     try:
-        result = conn.execute(query, x=search_column)
+        result = conn.execute(query)
         return [dict(row) for row in result.fetchall()]
     finally:
         conn.close()
