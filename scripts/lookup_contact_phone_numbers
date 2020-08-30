@@ -107,6 +107,10 @@ def get_unprocessed_contact_phone_numbers(db_url, search_column="id"):
     engine = create_engine(db_url)
     meta = MetaData(bind=engine)
     contact = Table("contact", meta, autoload=True, autoload_with=engine)
+    # There is an edge case where COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME will not
+    # be in contact table columns even if it's in contact case type on CommCare,
+    # if there are no cases for this property with non-null values. We need to
+    # only filter our query by this column value if it exists...
     has_can_sms_column = COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME in [
         col.name for col in contact.columns
     ]
