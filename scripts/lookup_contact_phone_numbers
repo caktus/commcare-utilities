@@ -5,7 +5,9 @@ import sys
 
 import phonenumbers
 import requests
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, MetaData, Table
+from sqlalchemy.sql import select, and_
+from sqlalchemy.sql.expression import func
 
 from common import logger, upload_data_to_commcare
 
@@ -24,13 +26,34 @@ class TwilioLookUpError(Exception):
 
 
 def format_phone_number(raw, region="US"):
+    """Format raw phone number into standardized format required by Twilio lookup API
+
+    Args:
+        raw (str): raw string representing a phone number
+        region (str): the expected region of the phone number. Defaults to US.
+
+    Returns:
+        str: Number formatted to Twilio lookup spec `+<country_code><national_number>`
+    """
     parsed = phonenumbers.parse(raw, region=region)
     return f"+{parsed.country_code}{parsed.national_number}"
 
 
-def twilio_lookup_phone_number(number, sid, auth_token):
+def twilio_lookup_phone_number_type(formatted_number, sid, auth_token):
+    """Determine phone number carrier type for a formatted number
+
+    Args:
+        formatted_number (str): Appropriately formatted number
+            `+<country_code><national_number>`
+        sid (str): A Twilio SID
+        auth_token (str): A Twilio auth token
+
+    Returns:
+        str indicating carrier type if number can be looked up, else None
+        if number can't be looked up.
+    """
     response = requests.get(
-        f"{TWILIO_LOOKUP_URL}/{number}",
+        f"{TWILIO_LOOKUP_URL}/{formatted_number}",
         auth=(sid, auth_token),
         params={"Type": "carrier"},
     )
@@ -39,7 +62,7 @@ def twilio_lookup_phone_number(number, sid, auth_token):
     elif response.status_code in WHITE_LISTED_TWILIO_CODES:
         return None
     else:
-        message = f"Something went wrong looking up number `{number}`."
+        message = f"Something went wrong looking up number `{formatted_number}`."
         info = {
             "twilio_status_code": response.json().get("status_code"),
             "twilio_error_code": response.json().get("code"),
@@ -49,37 +72,56 @@ def twilio_lookup_phone_number(number, sid, auth_token):
 
 
 def can_receive_sms(number_type):
+    """Determine if number type is SMS capable."""
     return number_type == "mobile"
 
 
 def process_phone_number(formatted_number, sid, auth_token):
+    """Determine if a formatted number can receive SMS.
+
+    Args:
+        formatted_number (str): Appropriately formatted number
+            `+<country_code><national_number>`
+        sid (str): A Twilio SID
+        auth_token (str): A Twilio auth token
+
+    Returns:
+        bool indicating if number can receive SMS if number can be looked up, else None
+    """
     return can_receive_sms(
-        twilio_lookup_phone_number(formatted_number, sid, auth_token)
+        twilio_lookup_phone_number_type(formatted_number, sid, auth_token)
     )
 
 
-# def contact_can_receive_sms_colum_exists(column_name, db_url):
-#     query =
-#     engine = create_engine(db_url)
+def get_unprocessed_contact_phone_numbers(db_url, search_column="id"):
+    """Get a list of contact phone numbers that haven't been processed for SMS cap.
 
+    Args:
+        db_url (str): the db connection URL
+        search_column (str): the name of the unique id column in the db for contact
 
-def get_unprocessed_contact_phone_numbers(db_url, search_column):
-    """"""
-    engine = create_engine(db_url)
-
-    # temporarily have `AND TRUE` as placeholder
-    # COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME defined at top of file. currently
-    # this column not making way into test DB so can't include in query here.
-    query = f"""
-        SELECT {search_column}, contact_phone_number FROM contact
-        WHERE
-            contact_phone_number IS NOT NULL
-            AND LENGTH(contact_phone_number) > 0
-            AND TRUE
+    Returns:
+        list: List of dicts with key/values for the search column and
+            `contact_phone_number`
     """
+    engine = create_engine(db_url)
+    meta = MetaData(bind=engine)
+    contact = Table("contact", meta, autoload=True, autoload_with=engine)
+    has_can_sms_column = COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME in [
+        col.name for col in contact.columns
+    ]
+    wheres = [
+        contact.c.contact_phone_number.isnot(None),
+        func.length(contact.c.contact_phone_number) > 0,
+    ]
+    if has_can_sms_column:
+        wheres.append(contact.c.contact_phone_can_receive_sms.is_(None))
+    query = select(
+        [getattr(contact.c, search_column), contact.c.contact_phone_number]
+    ).where(and_(*wheres))
     conn = engine.connect()
     try:
-        result = conn.execute(query)
+        result = conn.execute(query, x=search_column)
         return [dict(row) for row in result.fetchall()]
     finally:
         conn.close()
@@ -94,6 +136,20 @@ def main(
     twilio_token,
     search_column,
 ):
+    """The main routine
+
+    Args:
+        db_url (str): the db connection URL
+        commcare_user_name (str): The Commcare username (email address)
+        commcare_api_key (str): A Commcare API key for the user
+        commcare_project_name (str): The Commcare project being exported from
+        twilio_sid (str): A Twilio SID
+        twilio_token (str): A Twilio auth token
+        search_column (str): : The name of the column in the db for contact that
+            CommCare will match against in the bulk upload step. See
+            https://confluence.dimagi.com/display/commcarepublic/Bulk+Upload+Case+Data
+
+    """
     exit_status = 0
     data = [
         dict(item, **{COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME: None})
