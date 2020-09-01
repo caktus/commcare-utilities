@@ -92,7 +92,7 @@ def generate_source_target_mappings(source_columns):
         "date_opened",
     ] + sorted(source_columns)
     return [(source_col, source_col) for source_col in static_case_fields] + [
-        ("properties.%s" % make_sql_friendly(source_col), source_col)
+        (f"properties.{source_col}", make_sql_friendly(source_col))
         for source_col in properties
         if source_col not in static_case_fields
     ]
