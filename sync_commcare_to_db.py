@@ -21,7 +21,7 @@ def make_sql_friendly(value):
 
 
 def extract_property_names(case_summary_file, case_types):
-    """Get unique property names that appear in Case Summary File Excel file.
+    """Get unique property names that appear in the Case Summary Excel file.
     This function iterates over each property on the All Case Properties tab
     and gathers unique property names.
     Args:
