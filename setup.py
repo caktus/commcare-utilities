@@ -7,9 +7,11 @@ setup(
     url="https://github.com/caktus/commcare-utilities",
     author="Benjamin White",
     author_email="ben@benjamineugenewhite.com",
-    # license="MIT",
+    # license="MIT",   if/when we open source this, need to set right license type
     packages=["common"],
     install_requires=[
+        # commcare-export is a dependency of this package and it's pinned at 2.5.12
+        # so we do this to avoid version conflict.
         "openpyxl<=2.5.12",
         "requests",
         "commcare-export",

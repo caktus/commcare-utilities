@@ -15,8 +15,10 @@ TWILIO_LOOKUP_URL = "https://lookups.twilio.com/v1/PhoneNumbers"
 COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME = "contact_phone_can_receive_sms"
 
 WHITE_LISTED_TWILIO_CODES = [
-    404,
+    404,  # Twilio thinks it's not a valid number or otherwise can't find it
 ]
+
+TWILIO_MOBILE_CODE = "mobile"
 
 
 class TwilioLookUpError(Exception):
@@ -49,7 +51,7 @@ def twilio_lookup_phone_number_type(formatted_number, sid, auth_token):
         auth_token (str): A Twilio auth token
 
     Returns:
-        str indicating carrier type if number can be looked up, else None
+        str indicating carrier type if number can be looked up, else 'unknown'
         if number can't be looked up.
     """
     response = requests.get(
@@ -60,7 +62,7 @@ def twilio_lookup_phone_number_type(formatted_number, sid, auth_token):
     if response.ok:
         return response.json()["carrier"]["type"]
     elif response.status_code in WHITE_LISTED_TWILIO_CODES:
-        return None
+        return "unknown"
     else:
         message = f"Something went wrong looking up number `{formatted_number}`."
         info = {
@@ -73,7 +75,7 @@ def twilio_lookup_phone_number_type(formatted_number, sid, auth_token):
 
 def can_receive_sms(number_type):
     """Determine if number type is SMS capable."""
-    return number_type == "mobile"
+    return number_type == TWILIO_MOBILE_CODE
 
 
 def process_phone_number(formatted_number, sid, auth_token):
@@ -86,7 +88,7 @@ def process_phone_number(formatted_number, sid, auth_token):
         auth_token (str): A Twilio auth token
 
     Returns:
-        bool indicating if number can receive SMS if number can be looked up, else None
+        bool indicating if number can receive SMS if number can be looked up
     """
     return can_receive_sms(
         twilio_lookup_phone_number_type(formatted_number, sid, auth_token)
@@ -176,19 +178,12 @@ def main(
     exit_status = 0
     try:
         for item in formatted:
-            processed = process_phone_number(
+            item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = process_phone_number(
                 item["contact_phone_number"],
                 twilio_sid,
                 twilio_token,
             )
-            if processed:
-                item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = processed
-                twilio_processed.append(item)
-            else:
-                logger.warning(
-                    f"Phone number `{item['contact_phone_number']}` for contact with "
-                    f"ID {item['id']} could not be processed by Twilio. Moving on."
-                )
+            twilio_processed.append(item)
     except Exception as exc:
         logger.error(f"Something unexpected happened: {exc.message}")
         exit_status = 1
