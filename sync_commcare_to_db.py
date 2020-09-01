@@ -13,8 +13,8 @@ INVALID_SQL_CHARS = re.compile(r"[^\w]")
 
 def make_sql_friendly(value):
     """Some CommCare properties and case types include dashes, which make for
-    bothersome SQL queries. Remove any characters that are not alphanumeric
-    nor an underscore from value and return it."""
+    bothersome SQL queries. Remove any non-alphanumeric or underscore 
+    characters, then return resulting value."""
     # Do not substitute "-" with "_" because in at least once instance, that would
     # result in a duplicate property name ("date_opened").
     return INVALID_SQL_CHARS.sub("", value)
