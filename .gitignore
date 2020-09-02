@@ -4,3 +4,7 @@ venv
 .envrc
 .vscode
 assets
+logs
+.pyc
+/dist/
+/*.egg-info
