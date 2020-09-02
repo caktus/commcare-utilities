@@ -4,7 +4,6 @@ venv
 .envrc
 .vscode
 assets
-__pycache__
 logs
 .pyc
 /dist/
