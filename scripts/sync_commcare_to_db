@@ -1,11 +1,14 @@
+#!/usr/bin/env python
+
 import argparse
 import json
-import os
 import re
 from collections import defaultdict
+from pathlib import Path
 from datetime import datetime
 
 from openpyxl import Workbook, load_workbook
+from common import logger
 
 VALID_PROPERTY_NAME = re.compile(r"[\w-]+")
 INVALID_SQL_CHARS = re.compile(r"[^\w]")
@@ -13,7 +16,7 @@ INVALID_SQL_CHARS = re.compile(r"[^\w]")
 
 def make_sql_friendly(value):
     """Some CommCare properties and case types include dashes, which make for
-    bothersome SQL queries. Remove any non-alphanumeric or underscore 
+    bothersome SQL queries. Remove any non-alphanumeric or underscore
     characters, then return resulting value."""
     # Do not substitute "-" with "_" because in at least once instance, that would
     # result in a duplicate property name ("date_opened").
@@ -58,11 +61,11 @@ def generate_source_target_mappings(source_columns):
     Returns:
         list: List of tuples where item[0] is source name, and item[1] is target name
     """
-    # For some reason, the same values have different labels in different places in CommCare.
-    # this maps the case fields to the OData field names that the user is expecting. This
-    # list is taken from running a Case Data API query for a single case and removing any
-    # field names that start with "properties" or "xforms". The properties come in via
-    # source_columns, and I'm not sure what the xforms are.
+    # For some reason, the same values have different labels in different places in
+    # CommCare. this maps the case fields to the OData field names that the user is
+    # expecting. This list is taken from running a Case Data API query for a single
+    # case and removing any field names that start with "properties" or "xforms".
+    # The properties come in via source_columns, and I'm not sure what the xforms are.
     # https://confluence.dimagi.com/display/commcarepublic/Case+Data
     static_case_fields = [
         "case_id",
@@ -152,8 +155,8 @@ def get_previous_mapping(state_dir, case_type):
         mappings (list): List of tuples of form
             ("source_name", "target_name)
     """
-    state_path = os.path.join(state_dir, f"{case_type}-column-state.json")
-    if os.path.exists(state_path):
+    state_path = Path(state_dir).joinpath(f"{case_type}-column-state.json")
+    if state_path.exists:
         with open(state_path) as f:
             state = json.load(f)
             return [
@@ -177,7 +180,8 @@ def save_column_state(state_dir, case_type, mappings):
             ("source_name", "target_name)
     Returns: No return, but saves json file to save_path
     """
-    state_path = os.path.join(state_dir, f"{case_type}-column-state.json")
+    state_dir = Path(state_dir).mkdir(parents=True, exist_ok=True)
+    state_path = state_dir.join(f"{case_type}-column-state.json")
     state = {
         "case_type": case_type,
         "column_mappings": mappings,
@@ -196,7 +200,7 @@ def main(case_summary_file, case_types, output_file_path, state_dir):
         case_types (list): The case types (i.e, "contact", "lab_result, etc.)
         output_file_path (str): Where the workbook with source-column mappings lives
     """
-    print(f"Retrieving data from {case_summary_file} and extracting column names")
+    logger.info(f"Retrieving data from {case_summary_file} and extracting column names")
     properties_by_type = extract_property_names(case_summary_file, case_types)
 
     new_mappings = {
@@ -210,7 +214,7 @@ def main(case_summary_file, case_types, output_file_path, state_dir):
             if set(previous_mapping) != set(new_mapping):
                 save_column_state(state_dir, case_type, new_mapping)
 
-    print(f"Generating a temporary Excel workbook to {output_file_path}")
+    logger.info(f"Generating a temporary Excel workbook to {output_file_path}")
     wb = make_commcare_export_sync_xl_wb(new_mappings)
     wb.save(output_file_path)
 
@@ -227,11 +231,6 @@ if __name__ == "__main__":
         help='Space-separated list case types (e.g., "patient lab_result contact investigation")',
         dest="case_types",
         nargs="+",
-    )
-    parser.add_argument(
-        "--db",
-        help="The db url string of the db that data will be exported to",
-        dest="database_url_string",
     )
     parser.add_argument(
         "--state-dir",
