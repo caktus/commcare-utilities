@@ -156,7 +156,7 @@ def get_previous_mapping(state_dir, case_type):
             ("source_name", "target_name)
     """
     state_path = Path(state_dir).joinpath(f"{case_type}-column-state.json")
-    if state_path.exists:
+    if state_path.exists():
         with open(state_path) as f:
             state = json.load(f)
             return [
@@ -180,8 +180,9 @@ def save_column_state(state_dir, case_type, mappings):
             ("source_name", "target_name)
     Returns: No return, but saves json file to save_path
     """
-    state_dir = Path(state_dir).mkdir(parents=True, exist_ok=True)
-    state_path = state_dir.join(f"{case_type}-column-state.json")
+    state_dir = Path(state_dir)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state_path = state_dir.joinpath(f"{case_type}-column-state.json")
     state = {
         "case_type": case_type,
         "column_mappings": mappings,
