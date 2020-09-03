@@ -1,12 +1,12 @@
 import uuid
 
-from faker import Faker
 import requests
+from faker import Faker
 
 from cc_utilities.twilio_lookup import (
-    process_contacts,
-    TWILIO_MOBILE_CODE,
     COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME,
+    TWILIO_MOBILE_CODE,
+    process_contacts,
 )
 
 TWILIO_VOIP_CODE = "voip"

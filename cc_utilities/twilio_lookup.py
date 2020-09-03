@@ -1,10 +1,10 @@
 import copy
 
 import phonenumbers
-from phonenumbers import NumberParseException
 import requests
-from sqlalchemy import create_engine, MetaData, Table
-from sqlalchemy.sql import select, and_
+from phonenumbers import NumberParseException
+from sqlalchemy import MetaData, Table, create_engine
+from sqlalchemy.sql import and_, select
 from sqlalchemy.sql.expression import func
 
 from cc_utilities.logger import logger
@@ -26,10 +26,11 @@ class TwilioLookUpError(Exception):
 
 
 def process_contacts(data, search_column, twilio_sid, twilio_token):
-    """"""
+    """Process a set of contacts' phone numbers to determine if can have SMS sent"""
+
     contacts = [
         dict(
-            copy.deepcopy(item),
+            copy.deepcopy(item),  # vs fear of mutability...
             **{
                 COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME: None,
                 "standard_formatted_number": None,
@@ -55,16 +56,14 @@ def process_contacts(data, search_column, twilio_sid, twilio_token):
         if contact["standard_formatted_number"] is not None
     ]:
         contact[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = process_phone_number(
-            contact["contact_phone_number"],
-            twilio_sid,
-            twilio_token,
+            contact["contact_phone_number"], twilio_sid, twilio_token,
         )
 
     return contacts
 
 
 def cleanup_processed_contacts_with_numbers(processed):
-    """"""
+    """Remove unneeded key/value pairs from processed results to prep for CommCare"""
     for item in processed:
         item.pop("contact_phone_number")
         item.pop("standard_formatted_number")
