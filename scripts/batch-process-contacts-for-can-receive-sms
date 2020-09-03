@@ -1,0 +1,144 @@
+#!/usr/bin/env python
+
+import argparse
+import sys
+
+from phonenumbers import NumberParseException
+
+from cc_utilities.common import upload_data_to_commcare
+from cc_utilities.logger import logger
+from cc_utilities.twilio_lookup import (
+    format_phone_number,
+    get_unprocessed_contact_phone_numbers,
+    process_phone_number,
+)
+
+TWILIO_LOOKUP_URL = "https://lookups.twilio.com/v1/PhoneNumbers"
+COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME = "contact_phone_can_receive_sms"
+
+WHITE_LISTED_TWILIO_CODES = [
+    404,  # Twilio thinks it's not a valid number or otherwise can't find it
+]
+
+TWILIO_MOBILE_CODE = "mobile"
+
+
+def main(
+    db_url,
+    commcare_user_name,
+    commcare_api_key,
+    commcare_project_name,
+    twilio_sid,
+    twilio_token,
+    search_column,
+):
+    """The main routine
+
+    Args:
+        db_url (str): the db connection URL
+        commcare_user_name (str): The Commcare username (email address)
+        commcare_api_key (str): A Commcare API key for the user
+        commcare_project_name (str): The Commcare project being exported from
+        twilio_sid (str): A Twilio SID
+        twilio_token (str): A Twilio auth token
+        search_column (str): : The name of the column in the db for contact that
+            CommCare will match against in the bulk upload step. See
+            https://confluence.dimagi.com/display/commcarepublic/Bulk+Upload+Case+Data
+
+    """
+    exit_status = 0
+    data = [
+        dict(
+            item,
+            **{
+                COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME: None,
+                "standard_formatted_number": None,
+            },
+        )
+        for item in get_unprocessed_contact_phone_numbers(db_url, search_column)
+    ]
+    for item in data:
+        try:
+            item["standard_formatted_number"] = format_phone_number(
+                item["contact_phone_number"]
+            )
+        except NumberParseException:
+            logger.warning(
+                f"The number `{item['contact_phone_number']}` for contcact "
+                f"`{item[search_column]}` cannot be parsed and will be marked as "
+                f"unable to receive sms."
+            )
+            item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = False
+    exit_status = 0
+    try:
+        for item in [
+            item for item in data if item["standard_formatted_number"] is not None
+        ]:
+            item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = process_phone_number(
+                item["contact_phone_number"],
+                twilio_sid,
+                twilio_token,
+            )
+    except Exception as exc:
+        logger.error(f"Something unexpected happened: {exc.message}")
+        exit_status = 1
+    finally:
+        logger.info(
+            f"Will attempt to upload SMS capability status for {len(data)} contacts "
+            f"to CommCare."
+        )
+        # prep for export. delete key/values we don't need.
+        for item in data:
+            del item["contact_phone_number"]
+            del item["standard_formatted_number"]
+        upload_data_to_commcare(
+            data,
+            commcare_project_name,
+            "contact",
+            search_column,
+            commcare_user_name,
+            commcare_api_key,
+            "off",
+        )
+    sys.exit(exit_status)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--db",
+        help="The db url string of the db that contains contact data",
+        dest="db_url",
+    )
+    parser.add_argument(
+        "--username",
+        help="The Commcare username (email address)",
+        dest="commcare_user_name",
+    )
+    parser.add_argument("--apikey", help="A Commcare API key", dest="commcare_api_key")
+    parser.add_argument(
+        "--project", help="The Commcare project name", dest="commcare_project_name"
+    )
+    parser.add_argument(
+        "--twilioSID", help="The SID of a Twilio account", dest="twilio_sid"
+    )
+    parser.add_argument(
+        "--twilioToken", help="Auth token for the Twilio account", dest="twilio_token"
+    )
+    parser.add_argument(
+        "--searchColumn",
+        help="The column in db that will be matched as ID against Commcare's ID",
+        dest="search_column",
+        default="id",
+    )
+    args = parser.parse_args()
+    main(
+        args.db_url,
+        args.commcare_user_name,
+        args.commcare_api_key,
+        args.commcare_project_name,
+        args.twilio_sid,
+        args.twilio_token,
+        args.search_column,
+    )
