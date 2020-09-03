@@ -1,5 +1,11 @@
 # commcare-utilities
 
+<!-- markdownlint-disable no-inline-html -->
+<p align="left">
+  <a href="https://github.com/caktus/commcare-utilities/actions?query=workflow%3A%22Test%22"><img alt="test status badge" src="https://github.com/caktus/commcare-utilities/workflows/Test/badge.svg"></a>
+</p>
+<!-- markdownlint-enable no-inline-html -->
+
 This repo is for an assortment of scripts for developers working with Commcare.
 
 ## Setup
