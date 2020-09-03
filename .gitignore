@@ -9,4 +9,4 @@ logs
 /dist/
 /*.egg-info
 .eggs
-__pycache__
+__pycache__/

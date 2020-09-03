@@ -1,8 +1,13 @@
+import copy
+
 import phonenumbers
+from phonenumbers import NumberParseException
 import requests
 from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.sql import select, and_
 from sqlalchemy.sql.expression import func
+
+from cc_utilities.logger import logger
 
 TWILIO_LOOKUP_URL = "https://lookups.twilio.com/v1/PhoneNumbers"
 COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME = "contact_phone_can_receive_sms"
@@ -18,6 +23,52 @@ class TwilioLookUpError(Exception):
     def __init__(self, message, info):
         super(TwilioLookUpError, self).__init__(message)
         self.info = info
+
+
+def process_contacts(data, search_column, twilio_sid, twilio_token):
+    """"""
+    contacts = [
+        dict(
+            copy.deepcopy(item),
+            **{
+                COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME: None,
+                "standard_formatted_number": None,
+            },
+        )
+        for item in data
+    ]
+    for contact in contacts:
+        try:
+            contact["standard_formatted_number"] = format_phone_number(
+                contact["contact_phone_number"]
+            )
+        except NumberParseException:
+            logger.warning(
+                f"The number `{contact['contact_phone_number']}` for contcact "
+                f"`{contact[search_column]}` cannot be parsed and will be marked as "
+                f"unable to receive sms."
+            )
+            contact[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = False
+    for contact in [
+        contact
+        for contact in contacts
+        if contact["standard_formatted_number"] is not None
+    ]:
+        contact[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = process_phone_number(
+            contact["contact_phone_number"],
+            twilio_sid,
+            twilio_token,
+        )
+
+    return contacts
+
+
+def cleanup_processed_contacts_with_numbers(processed):
+    """"""
+    for item in processed:
+        item.pop("contact_phone_number")
+        item.pop("standard_formatted_number")
+    return processed
 
 
 def format_phone_number(raw, region="US"):

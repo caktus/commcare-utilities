@@ -22,9 +22,9 @@ setup(
     ],
     scripts=[
         "scripts/batch-process-contacts-for-can-receive-sms",
-        "scripts/sync-commcare-to-db",
+        "scripts/sync_commcare_to_db",
     ],
     zip_safe=False,
     setup_requires=["pytest-runner"],
-    tests_require=["pytest"],
+    tests_require=["pytest", "faker"],
 )
