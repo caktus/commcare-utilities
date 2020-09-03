@@ -25,6 +25,4 @@ setup(
         "scripts/sync_commcare_to_db",
     ],
     zip_safe=False,
-    setup_requires=["pytest-runner"],
-    tests_require=["pytest", "faker"],
 )
