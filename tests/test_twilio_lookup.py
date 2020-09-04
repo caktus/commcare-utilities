@@ -77,7 +77,7 @@ class TestBulkProcessNumbersCanReceiveSms:
     CommCare. We only narrowly test the business logic around `process_contacts`.
     """
 
-    def test_valid_mobile_us_number_can_receive_sms_is_true(self, monkeypatch):
+    def test_valid_mobile_us_number_can_receive_sms(self, monkeypatch):
         """Valid US mobile numbers should have `True` for SMS capability"""
 
         def mock_get(*args, **kwargs):
@@ -95,7 +95,7 @@ class TestBulkProcessNumbersCanReceiveSms:
         for item in processed:
             assert item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] is True
 
-    def test_valid_voip_us_number_can_receive_sms_is_false(self, monkeypatch):
+    def test_valid_voip_us_number_cant_receive_sms(self, monkeypatch):
         """Valid US VOIP numbers should have `False` for SMS capability"""
 
         def mock_get(*args, **kwargs):
@@ -113,7 +113,7 @@ class TestBulkProcessNumbersCanReceiveSms:
         for item in processed:
             assert item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] is False
 
-    def test_valid_landline_us_number_can_receive_sms_is_false(self, monkeypatch):
+    def test_valid_landline_us_number_cant_receive_sms(self, monkeypatch):
         """Valid US landline numbers should have `False` for SMS capability"""
 
         def mock_get(*args, **kwargs):
@@ -131,7 +131,7 @@ class TestBulkProcessNumbersCanReceiveSms:
         for item in processed:
             assert item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] is False
 
-    def test_valid_non_us_number_cant_receive_sms_is_false(self, monkeypatch):
+    def test_valid_non_us_number_cant_receive_sms(self, monkeypatch):
         """Valid non-US numbers should have `False` for SMS capability
 
         This is because our present use case is US-focused, and Twilio requires setting
@@ -153,7 +153,7 @@ class TestBulkProcessNumbersCanReceiveSms:
         for item in processed:
             assert item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] is False
 
-    def test_unformattable_phone_number_can_receive_sms_is_false(self):
+    def test_unformattable_phone_number_cant_receive_sms(self):
         """Invalid phonenumbers should have `False` for SMS capability"""
         search_column = "id"
         twilio_sid = twilio_token = "xxxxxx"
