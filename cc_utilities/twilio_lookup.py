@@ -7,16 +7,13 @@ from sqlalchemy import MetaData, Table, create_engine
 from sqlalchemy.sql import and_, select
 from sqlalchemy.sql.expression import func
 
-from cc_utilities.logger import logger
-
-TWILIO_LOOKUP_URL = "https://lookups.twilio.com/v1/PhoneNumbers"
-COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME = "contact_phone_can_receive_sms"
-
-WHITE_LISTED_TWILIO_CODES = [
-    404,  # Twilio thinks it's not a valid number or otherwise can't find it
-]
-
-TWILIO_MOBILE_CODE = "mobile"
+from .constants import (
+    COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME,
+    TWILIO_LOOKUP_URL,
+    TWILIO_MOBILE_CODE,
+    WHITE_LISTED_TWILIO_CODES,
+)
+from .logger import logger
 
 
 class TwilioLookUpError(Exception):
@@ -45,7 +42,7 @@ def process_contacts(data, search_column, twilio_sid, twilio_token):
             )
         except NumberParseException:
             logger.warning(
-                f"The number `{contact['contact_phone_number']}` for contcact "
+                f"The number `{contact['contact_phone_number']}` for contact "
                 f"`{contact[search_column]}` cannot be parsed and will be marked as "
                 f"unable to receive sms."
             )

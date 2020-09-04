@@ -3,15 +3,16 @@ import uuid
 import requests
 from faker import Faker
 
+from cc_utilities.constants import (
+    TWILIO_INVALID_NUMBER_FOR_REGION_CODE,
+    TWILIO_LANDLINE_CODE,
+    TWILIO_VOIP_CODE,
+)
 from cc_utilities.twilio_lookup import (
     COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME,
     TWILIO_MOBILE_CODE,
     process_contacts,
 )
-
-TWILIO_VOIP_CODE = "voip"
-TWILIO_LANDLINE_CODE = "landline"
-TWILIO_INVALID_NUMBER_FOR_REGION_CODE = 404
 
 
 class MockTwilioPhoneTypeMobileResponse:
