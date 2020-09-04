@@ -35,11 +35,13 @@ def main(
 
     """
     try:
+        unprocessed = get_unprocessed_contact_phone_numbers(db_url, search_column)
+        logger.info(f"{len(unprocessed)} unprocessed contacts found")
         contacts_data = cleanup_processed_contacts_with_numbers(
             process_contacts(
-                get_unprocessed_contact_phone_numbers(db_url, search_column),
+                unprocessed,
                 search_column,
-                twilio_token,
+                twilio_sid,
                 twilio_token,
             )
         )

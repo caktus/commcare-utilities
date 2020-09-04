@@ -50,14 +50,11 @@ def process_contacts(data, search_column, twilio_sid, twilio_token):
                 f"unable to receive sms."
             )
             contact[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = False
-    for contact in [
-        contact
-        for contact in contacts
-        if contact["standard_formatted_number"] is not None
-    ]:
-        contact[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = process_phone_number(
-            contact["contact_phone_number"], twilio_sid, twilio_token,
-        )
+    for contact in contacts:
+        if contact["standard_formatted_number"] is not None:
+            contact[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = process_phone_number(
+                contact["contact_phone_number"], twilio_sid, twilio_token,
+            )
 
     return contacts
 
