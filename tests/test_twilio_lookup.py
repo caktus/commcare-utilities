@@ -12,7 +12,7 @@ from cc_utilities.constants import (
     TWILIO_VOIP_CODE,
 )
 from cc_utilities.twilio_lookup import (
-    COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME,
+    COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME,
     TWILIO_MOBILE_CODE,
     process_contacts,
 )
@@ -99,7 +99,7 @@ class TestBulkProcessNumbersCanReceiveSms:
         ]
         processed = process_contacts(data, search_column, twilio_sid, twilio_token)
         for item in processed:
-            assert item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] == COMMCARE_CAN_SMS_LABEL
+            assert item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CAN_SMS_LABEL
 
     def test_valid_voip_us_number_cant_receive_sms(self, monkeypatch):
         """Valid US VOIP numbers should have `False` for SMS capability"""
@@ -121,7 +121,7 @@ class TestBulkProcessNumbersCanReceiveSms:
         processed = process_contacts(data, search_column, twilio_sid, twilio_token)
         for item in processed:
             assert (
-                item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
+                item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
             )
 
     def test_valid_landline_us_number_cant_receive_sms(self, monkeypatch):
@@ -144,7 +144,7 @@ class TestBulkProcessNumbersCanReceiveSms:
         processed = process_contacts(data, search_column, twilio_sid, twilio_token)
         for item in processed:
             assert (
-                item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
+                item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
             )
 
     def test_valid_non_us_number_cant_receive_sms(self, monkeypatch):
@@ -171,7 +171,7 @@ class TestBulkProcessNumbersCanReceiveSms:
         processed = process_contacts(data, search_column, twilio_sid, twilio_token)
         for item in processed:
             assert (
-                item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
+                item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
             )
 
     def test_unformattable_phone_number_cant_receive_sms(self):
@@ -186,5 +186,5 @@ class TestBulkProcessNumbersCanReceiveSms:
         processed = process_contacts(data, search_column, twilio_sid, twilio_token)
         for item in processed:
             assert (
-                item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
+                item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
             )

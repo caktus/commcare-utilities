@@ -8,7 +8,7 @@ from sqlalchemy.sql import and_, or_, select
 from sqlalchemy.sql.expression import func
 
 from .constants import (
-    COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME,
+    COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME,
     COMMCARE_CAN_SMS_LABEL,
     COMMCARE_CANNOT_SMS_LABEL,
     COMMCARE_CONTACT_PHONE_FIELD,
@@ -33,7 +33,7 @@ def process_contacts(data, search_column, twilio_sid, twilio_token):
         dict(
             copy.deepcopy(item),  # vs fear of mutability...
             **{
-                COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME: None,
+                COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME: None,
                 "standard_formatted_number": None,
             },
         )
@@ -50,10 +50,10 @@ def process_contacts(data, search_column, twilio_sid, twilio_token):
                 f"`{contact[search_column]}` cannot be parsed and will be marked as "
                 f"unable to receive sms."
             )
-            contact[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = COMMCARE_CANNOT_SMS_LABEL
+            contact[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] = COMMCARE_CANNOT_SMS_LABEL
     for contact in contacts:
         if contact["standard_formatted_number"] is not None:
-            contact[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = process_phone_number(
+            contact[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] = process_phone_number(
                 contact[COMMCARE_CONTACT_PHONE_FIELD], twilio_sid, twilio_token,
             )
 
@@ -159,11 +159,11 @@ def get_unprocessed_contact_phone_numbers(db_url, search_column="id"):
     assert COMMCARE_CONTACT_PHONE_FIELD in [
         col.name for col in contact.columns
     ], f"{COMMCARE_CONTACT_PHONE_FIELD} not in contacts table"
-    # There is an edge case where COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME will not
+    # There is an edge case where COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME will not
     # be in contact table columns even if it's in contact case type on CommCare,
     # if there are no cases for this property with non-null values. We need to
     # only filter our query by this column value if it exists...
-    has_can_sms_column = COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME in [
+    has_can_sms_column = COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME in [
         col.name for col in contact.columns
     ]
 
@@ -174,8 +174,8 @@ def get_unprocessed_contact_phone_numbers(db_url, search_column="id"):
     if has_can_sms_column:
         wheres.append(
             or_(
-                getattr(contact.cm, COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME).is_(None),
-                getattr(contact.cm, COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME)
+                getattr(contact.cm, COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME).is_(None),
+                getattr(contact.cm, COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME)
                 == COMMCARE_UNSET_CAN_SMS_LABEL,
             )
         )

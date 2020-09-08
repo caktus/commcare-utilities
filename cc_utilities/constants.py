@@ -1,6 +1,6 @@
 BULK_UPLOAD_URL = "https://www.commcarehq.org/a/{}/importer/excel/bulk_upload_api/"
 COMMCARE_CONTACT_PHONE_FIELD = "phone_home"
-COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME = "api_phone_home_sms_verification"
+COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME = "api_phone_home_sms_verification"
 COMMCARE_UPLOAD_STATES = dict(missing=-1, not_started=0, started=1, success=2, failed=3)
 COMMCARE_UNSET_CAN_SMS_LABEL = "pending"
 COMMCARE_CANNOT_SMS_LABEL = "no"
