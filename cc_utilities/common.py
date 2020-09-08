@@ -3,10 +3,8 @@ import time
 import pandas as pd
 import requests
 
+from .constants import BULK_UPLOAD_URL, COMMCARE_UPLOAD_STATES
 from .logger import logger
-
-BULK_UPLOAD_URL = "https://www.commcarehq.org/a/{}/importer/excel/bulk_upload_api/"
-COMMCARE_UPLOAD_STATES = dict(missing=-1, not_started=0, started=1, success=2, failed=3)
 
 
 class CommCareUtilitiesError(Exception):
