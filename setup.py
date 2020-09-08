@@ -22,7 +22,7 @@ setup(
     ],
     scripts=[
         "scripts/batch-process-contacts-for-can-receive-sms",
-        "scripts/sync_commcare_to_db",
+        "scripts/generate-case-export-query-file",
     ],
     zip_safe=False,
 )
