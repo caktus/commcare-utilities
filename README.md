@@ -38,11 +38,13 @@ Note the following oddity: When `commcare-export` encounters properties that do 
 1. Navigate to the [Case Summary](https://confluence.dimagi.com/display/commcarepublic/App+Summary#AppSummary-CaseSummary) page (under App Summary) in the CommCare web interface, and download the corresponding Excel file. It should have an "All Case Properties" tab (this is the only tab that is needed).
 2. Run the script, specifying the input file, desired case type(s), and output locations. For instance, to export "patient" and "contact" case records:
 
-    CASE_SUMMARY_FILE="MyApp - All Case Properties.xlsx"
-    STATE_DIR="repo/export_query_files/commcare-project-name/"
-    OUTPUT_FILE="${STATE_DIR}query_file.xlsx"
+   ```
+   CASE_SUMMARY_FILE="MyApp - All Case Properties.xlsx"
+   STATE_DIR="repo/export_query_files/commcare-project-name/"
+   OUTPUT_FILE="${STATE_DIR}query_file.xlsx"
 
-    generate-case-export-query-file --case-summary-file "$CASE_SUMMARY_FILE" --case-type patient contact --state-dir $STATE_DIR --output $OUTPUT_FILE
+   generate-case-export-query-file --case-summary-file "$CASE_SUMMARY_FILE" --case-type patient contact --state-dir $STATE_DIR --output $OUTPUT_FILE
+   ```
 
 3. Run the `commcare-export` tool as provided in [its documentation](https://confluence.dimagi.com/display/commcarepublic/CommCare+Data+Export+Tool). Any new columns added to the DB will be noted in the command-line output of the script.
 
