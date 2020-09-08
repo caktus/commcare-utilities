@@ -27,7 +27,7 @@ tox
 
 ### `generate-case-export-query-file`
 
-This script allows a user to generate an Excel query file to facilitate export exporting data from Commcare to a SQL database or other local data store. It does by iterating over all records returned in the supplied [Case Summary](https://confluence.dimagi.com/display/commcarepublic/App+Summary#AppSummary-CaseSummary) Excel file to build a list of all observed property names to be turned into column names in a SQL db.
+This script allows a user to generate an Excel query file to facilitate exporting data from CommCare to a SQL database or other local data store. It does by iterating over all records returned in the supplied [Case Summary](https://confluence.dimagi.com/display/commcarepublic/App+Summary#AppSummary-CaseSummary) Excel file to build a list of all observed property names to be turned into column names in a SQL db.
 
 An Excel workbook is created [as required by `commcare-export`](https://confluence.dimagi.com/display/commcarepublic/CommCare+Data+Export+Tool#CommCareDataExportTool-HowtoGenerateanExcelQueryFile), containing source to target column mappings. A separate tab is created for each case type. This same information is stored in a JSON, to make results auditable without requiring Excel. The JSON files are for informational purposes only; they can, for example, be checked into version control in a separate repository to help identify and provide a log of changes to the columns in the database over time. The JSON files are not used as an input to the process, so it is possible for fields to be removed if they are deprecated in the CommCare app.
 
@@ -35,12 +35,16 @@ Note the following oddity: When `commcare-export` encounters properties that do 
 
 **Running the script:**
 
-1. Create an OData feed in Commcare for any case types you want to export, and grab the URL for the feed.
-2. Gather your Commcare API key and user name (email address)
-3. Install the appropriate db engine library for your database. If you're not sure what that is, run the script without doing this, and you'll get a `ModuleNotFoundError` with the name of the required library.
-4. Optionally, copy over `sample.env` to `.env` and insert appropriate values. Source those values before the next step.
-5. Run the script. For instance, to export contact case type records: `sync_commcare_to_db --feed-url $CONTACT_FEED_URL --db $DB_URL --username $COMMCARE_USER --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT --case-type contact`.
-6. Any new columns added to the DB will be noted in the command-line output of the script.
+1. Navigate to the [Case Summary](https://confluence.dimagi.com/display/commcarepublic/App+Summary#AppSummary-CaseSummary) page (under App Summary) in the CommCare web interface, and download the corresponding Excel file. It should have an "All Case Properties" tab (this is the only tab that is needed).
+2. Run the script, specifying the input file, desired case type(s), and output locations. For instance, to export "patient" and "contact" case records:
+
+    CASE_SUMMARY_FILE="MyApp - All Case Properties.xlsx"
+    STATE_DIR="repo/export_query_files/commcare-project-name/"
+    OUTPUT_FILE="${STATE_DIR}query_file.xlsx"
+
+    generate-case-export-query-file --case-summary-file "$CASE_SUMMARY_FILE" --case-type patient contact --state-dir $STATE_DIR --output $OUTPUT_FILE
+
+3. Run the `commcare-export` tool as provided in [its documentation](https://confluence.dimagi.com/display/commcarepublic/CommCare+Data+Export+Tool). Any new columns added to the DB will be noted in the command-line output of the script.
 
 ### `batch-process-contacts-for-can-receive-sms`
 
