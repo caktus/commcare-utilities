@@ -140,7 +140,7 @@ def process_phone_number(formatted_number, sid, auth_token):
     )
 
 
-def get_unprocessed_contact_home_numbers(db_url, search_column="id"):
+def get_unprocessed_contact_phone_numbers(db_url, search_column="id"):
     """Get a list of contact phone numbers that haven't been verified for SMS
 
     Args:
