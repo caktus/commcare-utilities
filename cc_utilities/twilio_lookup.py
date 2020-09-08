@@ -4,11 +4,15 @@ import phonenumbers
 import requests
 from phonenumbers import NumberParseException
 from sqlalchemy import MetaData, Table, create_engine
-from sqlalchemy.sql import and_, select
+from sqlalchemy.sql import and_, or_, select
 from sqlalchemy.sql.expression import func
 
 from .constants import (
     COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME,
+    COMMCARE_CAN_SMS_LABEL,
+    COMMCARE_CANNOT_SMS_LABEL,
+    COMMCARE_CONTACT_PHONE_FIELD,
+    COMMCARE_UNSET_CAN_SMS_LABEL,
     TWILIO_LOOKUP_URL,
     TWILIO_MOBILE_CODE,
     WHITE_LISTED_TWILIO_CODES,
@@ -38,19 +42,19 @@ def process_contacts(data, search_column, twilio_sid, twilio_token):
     for contact in contacts:
         try:
             contact["standard_formatted_number"] = format_phone_number(
-                contact["contact_phone_number"]
+                contact[COMMCARE_CONTACT_PHONE_FIELD]
             )
         except NumberParseException:
             logger.warning(
-                f"The number `{contact['contact_phone_number']}` for contact "
+                f"The number `{contact[COMMCARE_CONTACT_PHONE_FIELD]}` for contact "
                 f"`{contact[search_column]}` cannot be parsed and will be marked as "
                 f"unable to receive sms."
             )
-            contact[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = False
+            contact[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = COMMCARE_CANNOT_SMS_LABEL
     for contact in contacts:
         if contact["standard_formatted_number"] is not None:
             contact[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] = process_phone_number(
-                contact["contact_phone_number"], twilio_sid, twilio_token,
+                contact[COMMCARE_CONTACT_PHONE_FIELD], twilio_sid, twilio_token,
             )
 
     return contacts
@@ -59,7 +63,7 @@ def process_contacts(data, search_column, twilio_sid, twilio_token):
 def cleanup_processed_contacts_with_numbers(processed):
     """Remove unneeded key/value pairs from processed results to prep for CommCare"""
     for item in processed:
-        item.pop("contact_phone_number")
+        item.pop(COMMCARE_CONTACT_PHONE_FIELD)
         item.pop("standard_formatted_number")
     return processed
 
@@ -110,13 +114,17 @@ def twilio_lookup_phone_number_type(formatted_number, sid, auth_token):
         raise TwilioLookUpError(message, info)
 
 
-def can_receive_sms(number_type):
-    """Determine if number type is SMS capable."""
-    return number_type == TWILIO_MOBILE_CODE
+def get_sms_capability(number_type):
+    """Get sms capability label for a number type."""
+    return (
+        COMMCARE_CAN_SMS_LABEL
+        if number_type == TWILIO_MOBILE_CODE
+        else COMMCARE_CANNOT_SMS_LABEL
+    )
 
 
 def process_phone_number(formatted_number, sid, auth_token):
-    """Determine if a formatted number can receive SMS.
+    """Get label for SMS capability of a phone number
 
     Args:
         formatted_number (str): Appropriately formatted number
@@ -125,19 +133,21 @@ def process_phone_number(formatted_number, sid, auth_token):
         auth_token (str): A Twilio auth token
 
     Returns:
-        bool indicating if number can receive SMS if number can be looked up
+        Str indicating sms capability of looked up number
     """
-    return can_receive_sms(
+    return get_sms_capability(
         twilio_lookup_phone_number_type(formatted_number, sid, auth_token)
     )
 
 
-def get_unprocessed_contact_phone_numbers(db_url, search_column="id"):
-    """Get a list of contact phone numbers that haven't been processed for SMS cap.
+def get_unprocessed_contact_home_numbers(db_url, search_column="id"):
+    """Get a list of contact phone numbers that haven't been verified for SMS
 
     Args:
         db_url (str): the db connection URL
         search_column (str): the name of the unique id column in the db for contact
+        phone_field (str): the name of the column/field storing phone number to look up
+        can_sms_field (str): the name of the column/field to store SMS capability state
 
     Returns:
         list: List of dicts with key/values for the search column and
@@ -146,6 +156,9 @@ def get_unprocessed_contact_phone_numbers(db_url, search_column="id"):
     engine = create_engine(db_url)
     meta = MetaData(bind=engine)
     contact = Table("contact", meta, autoload=True, autoload_with=engine)
+    assert COMMCARE_CONTACT_PHONE_FIELD in [
+        col.name for col in contact.columns
+    ], f"{COMMCARE_CONTACT_PHONE_FIELD} not in contacts table"
     # There is an edge case where COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME will not
     # be in contact table columns even if it's in contact case type on CommCare,
     # if there are no cases for this property with non-null values. We need to
@@ -153,14 +166,24 @@ def get_unprocessed_contact_phone_numbers(db_url, search_column="id"):
     has_can_sms_column = COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME in [
         col.name for col in contact.columns
     ]
+
     wheres = [
-        contact.c.contact_phone_number.isnot(None),
-        func.length(contact.c.contact_phone_number) > 0,
+        getattr(contact.c, COMMCARE_CONTACT_PHONE_FIELD).isnot(None),
+        func.length(getattr(contact.c, COMMCARE_CONTACT_PHONE_FIELD)) > 0,
     ]
     if has_can_sms_column:
-        wheres.append(contact.c.contact_phone_can_receive_sms.is_(None))
+        wheres.append(
+            or_(
+                getattr(contact.cm, COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME).is_(None),
+                getattr(contact.cm, COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME)
+                == COMMCARE_UNSET_CAN_SMS_LABEL,
+            )
+        )
     query = select(
-        [getattr(contact.c, search_column), contact.c.contact_phone_number]
+        [
+            getattr(contact.c, search_column),
+            getattr(contact.c, COMMCARE_CONTACT_PHONE_FIELD),
+        ]
     ).where(and_(*wheres))
     conn = engine.connect()
     try:

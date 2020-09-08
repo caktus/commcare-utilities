@@ -7,7 +7,7 @@ from cc_utilities.logger import logger
 from cc_utilities.twilio_lookup import (
     cleanup_processed_contacts_with_numbers,
     process_contacts,
-    get_unprocessed_contact_phone_numbers,
+    get_unprocessed_contact_home_phone_numbers,
 )
 
 
@@ -35,7 +35,7 @@ def main(
 
     """
     try:
-        unprocessed = get_unprocessed_contact_phone_numbers(db_url, search_column)
+        unprocessed = get_unprocessed_contact_home_phone_numbers(db_url, search_column)
         logger.info(f"{len(unprocessed)} unprocessed contacts found")
         contacts_data = cleanup_processed_contacts_with_numbers(
             process_contacts(
