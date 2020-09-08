@@ -13,6 +13,42 @@ from common import logger
 VALID_PROPERTY_NAME = re.compile(r"[\w-]+")
 INVALID_SQL_CHARS = re.compile(r"[^\w]")
 
+# For some reason, the same values have different labels in different places in
+# CommCare. This list is taken from running a Case Data API query for a single
+# case and removing any field names that start with "properties" or "xforms".
+# The properties are app specific and are determined via the Case Summary
+# Excel file, and I'm not sure what the xforms are.
+# https://confluence.dimagi.com/display/commcarepublic/Case+Data
+STATIC_CASE_FIELDS = [
+    "case_id",
+    "closed",
+    "closed_by",
+    "date_closed",
+    "date_modified",
+    "domain",
+    "id",
+    "indexed_on",
+    "indices.parent.case_id",
+    "indices.parent.case_type",
+    "indices.parent.relationship",
+    "opened_by",
+    "resource_uri",
+    "server_date_modified",
+    "server_date_opened",
+    "user_id",
+]
+
+# The CommCare API documentation also includes several "special case properties"
+# which appear to be standard for cases, but do require the "properties." prefix.
+# https://confluence.dimagi.com/display/commcarepublic/Case+Data
+SPECIAL_CASE_PROPERTIES = [
+    "owner_id",
+    "case_name",
+    "external_id",
+    "case_type",
+    "date_opened",
+]
+
 
 def make_sql_friendly(value):
     """Some CommCare properties and case types include dashes, which make for
@@ -53,7 +89,8 @@ def extract_property_names(case_summary_file, case_types):
 
 
 def generate_source_target_mappings(source_columns):
-    """Generate mapping of source column names to target column names for db
+    """Generate mapping of source column names to target column names for db. Prepends
+    STATIC_CASE_FIELDS and SPECIAL_CASE_PROPERTIES (defined above) to the output.
 
     Args:
         source_columns (list): List of source column names
@@ -61,43 +98,13 @@ def generate_source_target_mappings(source_columns):
     Returns:
         list: List of tuples where item[0] is source name, and item[1] is target name
     """
-    # For some reason, the same values have different labels in different places in
-    # CommCare. this maps the case fields to the OData field names that the user is
-    # expecting. This list is taken from running a Case Data API query for a single
-    # case and removing any field names that start with "properties" or "xforms".
-    # The properties come in via source_columns, and I'm not sure what the xforms are.
-    # https://confluence.dimagi.com/display/commcarepublic/Case+Data
-    static_case_fields = [
-        "case_id",
-        "closed",
-        "closed_by",
-        "date_closed",
-        "date_modified",
-        "domain",
-        "id",
-        "indexed_on",
-        "indices.parent.case_id",
-        "indices.parent.case_type",
-        "indices.parent.relationship",
-        "opened_by",
-        "resource_uri",
-        "server_date_modified",
-        "server_date_opened",
-        "user_id",
-    ]
-    # Also prepend special properties (per the API docs) at the start of the list:
-    # https://confluence.dimagi.com/display/commcarepublic/Case+Data
-    properties = [
-        "owner_id",
-        "case_name",
-        "external_id",
-        "case_type",
-        "date_opened",
-    ] + sorted(source_columns)
-    return [(source_col, source_col) for source_col in static_case_fields] + [
+    property_names = SPECIAL_CASE_PROPERTIES + sorted(
+        prop for prop in source_columns if prop not in SPECIAL_CASE_PROPERTIES
+    )
+    return [(source_col, source_col) for source_col in STATIC_CASE_FIELDS] + [
         (f"properties.{source_col}", make_sql_friendly(source_col))
-        for source_col in properties
-        if source_col not in static_case_fields
+        for source_col in property_names
+        if source_col not in STATIC_CASE_FIELDS
     ]
 
 
