@@ -20,9 +20,11 @@ setup(
         "phonenumbers",
         "pandas",
     ],
-    scripts=[
-        "scripts/batch-process-contacts-for-can-receive-sms",
-        "scripts/sync_commcare_to_db",
-    ],
+    entry_points={
+        "console_scripts": [
+            "process-numbers-for-sms-capability=cc_utilities.command_line.process_numbers_for_sms_capability:main",
+            "sync-commcare-to-db=cc_utilities.command_line.sync_commcare_to_db:main",
+        ]
+    },
     zip_safe=False,
 )

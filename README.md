@@ -25,7 +25,7 @@ tox
 
 ## Scripts
 
-### `sync_commcare_to_db`
+### `sync-commcare-to-db`
 
 This script allows a user to export data from Commcare to a SQL database. It does by iterating over all records returned in an OData feed for a particular case type to build a list of all observed property names (whether current or deprecated) to be turned into column names in a SQL db. It then calls [`commcare-export`](https://github.com/dimagi/commcare-export) as a subprocess, attempting to all cases with all observed property names to the db. Note that this script attempts to sync both current and deprecated fields to the target DB.
 
@@ -41,10 +41,10 @@ Note the following oddity: When `commcare-export` encounters properties that do 
 2. Gather your Commcare API key and user name (email address)
 3. Install the appropriate db engine library for your database. If you're not sure what that is, run the script without doing this, and you'll get a `ModuleNotFoundError` with the name of the required library.
 4. Optionally, copy over `sample.env` to `.env` and insert appropriate values. Source those values before the next step.
-5. Run the script. For instance, to export contact case type records: `sync_commcare_to_db --feed-url $CONTACT_FEED_URL --db $DB_URL --username $COMMCARE_USER --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT --case-type contact`.
+5. Run the script. For instance, to export contact case type records: `sync-commcare-to-db --feed-url $CONTACT_FEED_URL --db $DB_URL --username $COMMCARE_USER --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT --case-type contact`.
 6. Any new columns added to the DB will be noted in the command-line output of the script.
 
-### `batch-process-contacts-for-can-receive-sms`
+### `process-numbers-for-sms-capability`
 
 This script allows a user to run unprocessed contact phone numbers through the [Twilio Lookup API](https://www.twilio.com/docs/lookup/api) in order to determine if contacts can be reached by SMS. To do this, it queries a database for unprocessed contacts, queries the Twilio Lookup API for each number, then uses the [CommCare bulk upload API](https://confluence.dimagi.com/display/commcarepublic/Bulk+Upload+Case+Data) to update the `contact_phone_can_receive_sms` property on these cases.
 
@@ -60,7 +60,7 @@ Finally, note that this script presently is configured to work with US-based pho
 2. Gather your Twilio SID and auth token.
 3. Install the appropriate db engine library for your database. If you're not sure what that is, run the script without doing this, and you'll get a `ModuleNotFoundError` with the name of the required library.
 4. Optionally, copy over `sample.env` to `.env` and insert appropriate values. Source those values before the next step.
-5. Run the script. Assuming the referenced variables are set: `batch-process-contacts-for-can-receive-sms --db $DB_URL --username $COMMCARE_USER --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT --twilioSID $TWILIO_SID --twilioToken $TWILIO_TOKEN`.
+5. Run the script. Assuming the referenced variables are set: `process-numbers-for-sms-capability --db $DB_URL --username $COMMCARE_USER --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT --twilioSID $TWILIO_SID --twilioToken $TWILIO_TOKEN`.
 6. Any new columns added to the DB will be noted in the command-line output of the script.
 
 ## Logging

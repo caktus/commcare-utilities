@@ -1,17 +1,15 @@
-#!/usr/bin/env python
-
 import argparse
 
 from cc_utilities.common import upload_data_to_commcare
 from cc_utilities.logger import logger
 from cc_utilities.twilio_lookup import (
     cleanup_processed_contacts_with_numbers,
-    process_contacts,
     get_unprocessed_contact_phone_numbers,
+    process_contacts,
 )
 
 
-def main(
+def main_with_args(
     db_url,
     commcare_user_name,
     commcare_api_key,
@@ -38,12 +36,7 @@ def main(
         unprocessed = get_unprocessed_contact_phone_numbers(db_url, search_column)
         logger.info(f"{len(unprocessed)} unprocessed contacts found")
         contacts_data = cleanup_processed_contacts_with_numbers(
-            process_contacts(
-                unprocessed,
-                search_column,
-                twilio_sid,
-                twilio_token,
-            )
+            process_contacts(unprocessed, search_column, twilio_sid, twilio_token,)
         )
     except Exception as exc:
         logger.error(f"Something unexpected happened: {exc.message}")
@@ -63,7 +56,7 @@ def main(
     )
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -93,7 +86,7 @@ if __name__ == "__main__":
         default="id",
     )
     args = parser.parse_args()
-    main(
+    main_with_args(
         args.db_url,
         args.commcare_user_name,
         args.commcare_api_key,

@@ -1,15 +1,13 @@
-#!/usr/bin/env python
-
 import argparse
 import json
-from pathlib import Path
 import subprocess
 from datetime import datetime
+from pathlib import Path
 
 import requests
 from openpyxl import Workbook
 
-from common import logger
+from cc_utilities.logger import logger
 
 
 def extract_property_names_from_case_data(
@@ -178,7 +176,7 @@ def do_commcare_export_to_db(
     subprocess.run(commands)
 
 
-def main(
+def main_with_args(
     feed_url,
     filter_value,
     database_url_string,
@@ -251,10 +249,7 @@ def main(
         else Path(__file__)
         .parent.absolute()
         .joinpath(
-            "..",
-            "assets",
-            commcare_project_name,
-            f"{filter_value}-mappings.xlsx",
+            "..", "assets", commcare_project_name, f"{filter_value}-mappings.xlsx",
         )
     )
 
@@ -276,7 +271,7 @@ def main(
     )
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--feed-url", help="URL of Commcare OData feed", dest="feed_url"
@@ -306,7 +301,7 @@ if __name__ == "__main__":
         dest="previous_column_state_path",
     )
     args = parser.parse_args()
-    main(
+    main_with_args(
         args.feed_url,
         args.filter_value,
         args.database_url_string,
