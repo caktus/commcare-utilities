@@ -23,7 +23,7 @@ setup(
     entry_points={
         "console_scripts": [
             "process-numbers-for-sms-capability=cc_utilities.command_line.process_numbers_for_sms_capability:main",
-            "sync-commcare-to-db=cc_utilities.command_line.sync_commcare_to_db:main",
+            "generate-case-export-query-file=cc_utilities.command_line.generate_case_export_query_file:main",
         ]
     },
     zip_safe=False,
