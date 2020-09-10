@@ -146,8 +146,6 @@ def get_unprocessed_contact_phone_numbers(db_url, search_column="id"):
     Args:
         db_url (str): the db connection URL
         search_column (str): the name of the unique id column in the db for contact
-        phone_field (str): the name of the column/field storing phone number to look up
-        can_sms_field (str): the name of the column/field to store SMS capability state
 
     Returns:
         list: List of dicts with key/values for the search column and
