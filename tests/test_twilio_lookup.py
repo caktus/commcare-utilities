@@ -4,12 +4,15 @@ import requests
 from faker import Faker
 
 from cc_utilities.constants import (
+    COMMCARE_CAN_SMS_LABEL,
+    COMMCARE_CANNOT_SMS_LABEL,
+    COMMCARE_CONTACT_PHONE_FIELD,
     TWILIO_INVALID_NUMBER_FOR_REGION_CODE,
     TWILIO_LANDLINE_CODE,
     TWILIO_VOIP_CODE,
 )
 from cc_utilities.twilio_lookup import (
-    COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME,
+    COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME,
     TWILIO_MOBILE_CODE,
     process_contacts,
 )
@@ -88,12 +91,15 @@ class TestBulkProcessNumbersCanReceiveSms:
         twilio_sid = twilio_token = "xxxxxx"
         fake = Faker("en_US")
         data = [
-            {search_column: uuid.uuid1(), "contact_phone_number": fake.phone_number()}
+            {
+                search_column: uuid.uuid1(),
+                COMMCARE_CONTACT_PHONE_FIELD: fake.phone_number(),
+            }
             for _ in range(5)
         ]
         processed = process_contacts(data, search_column, twilio_sid, twilio_token)
         for item in processed:
-            assert item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] is True
+            assert item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CAN_SMS_LABEL
 
     def test_valid_voip_us_number_cant_receive_sms(self, monkeypatch):
         """Valid US VOIP numbers should have `False` for SMS capability"""
@@ -106,12 +112,17 @@ class TestBulkProcessNumbersCanReceiveSms:
         twilio_sid = twilio_token = "xxxxxx"
         fake = Faker("en_US")
         data = [
-            {search_column: uuid.uuid1(), "contact_phone_number": fake.phone_number()}
+            {
+                search_column: uuid.uuid1(),
+                COMMCARE_CONTACT_PHONE_FIELD: fake.phone_number(),
+            }
             for _ in range(5)
         ]
         processed = process_contacts(data, search_column, twilio_sid, twilio_token)
         for item in processed:
-            assert item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] is False
+            assert (
+                item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
+            )
 
     def test_valid_landline_us_number_cant_receive_sms(self, monkeypatch):
         """Valid US landline numbers should have `False` for SMS capability"""
@@ -124,12 +135,17 @@ class TestBulkProcessNumbersCanReceiveSms:
         twilio_sid = twilio_token = "xxxxxx"
         fake = Faker("en_US")
         data = [
-            {search_column: uuid.uuid1(), "contact_phone_number": fake.phone_number()}
+            {
+                search_column: uuid.uuid1(),
+                COMMCARE_CONTACT_PHONE_FIELD: fake.phone_number(),
+            }
             for _ in range(5)
         ]
         processed = process_contacts(data, search_column, twilio_sid, twilio_token)
         for item in processed:
-            assert item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] is False
+            assert (
+                item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
+            )
 
     def test_valid_non_us_number_cant_receive_sms(self, monkeypatch):
         """Valid non-US numbers should have `False` for SMS capability
@@ -146,22 +162,29 @@ class TestBulkProcessNumbersCanReceiveSms:
         twilio_sid = twilio_token = "xxxxxx"
         fake = Faker("en_CA")
         data = [
-            {search_column: uuid.uuid1(), "contact_phone_number": fake.phone_number()}
+            {
+                search_column: uuid.uuid1(),
+                COMMCARE_CONTACT_PHONE_FIELD: fake.phone_number(),
+            }
             for _ in range(5)
         ]
         processed = process_contacts(data, search_column, twilio_sid, twilio_token)
         for item in processed:
-            assert item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] is False
+            assert (
+                item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
+            )
 
     def test_unformattable_phone_number_cant_receive_sms(self):
         """Invalid phonenumbers should have `False` for SMS capability"""
         search_column = "id"
         twilio_sid = twilio_token = "xxxxxx"
         data = [
-            {search_column: uuid.uuid1(), "contact_phone_number": "abcdefg"},
-            {search_column: uuid.uuid1(), "contact_phone_number": ""},
-            {search_column: uuid.uuid1(), "contact_phone_number": " "},
+            {search_column: uuid.uuid1(), COMMCARE_CONTACT_PHONE_FIELD: "abcdefg"},
+            {search_column: uuid.uuid1(), COMMCARE_CONTACT_PHONE_FIELD: ""},
+            {search_column: uuid.uuid1(), COMMCARE_CONTACT_PHONE_FIELD: " "},
         ]
         processed = process_contacts(data, search_column, twilio_sid, twilio_token)
         for item in processed:
-            assert item[COMMCARE_CAN_RECIEVE_SMS_FIELD_NAME] is False
+            assert (
+                item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
+            )

@@ -1,14 +1,13 @@
-#!/usr/bin/env python
-
 import argparse
 import json
 import re
 from collections import defaultdict
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
-from cc_utilities.common import logger
+
+from cc_utilities.logger import logger
 
 VALID_PROPERTY_NAME = re.compile(r"[\w-]+")
 INVALID_SQL_CHARS = re.compile(r"[^\w]")
@@ -201,7 +200,7 @@ def save_column_state(state_dir, case_type, mappings):
         f.write("\n")
 
 
-def main(case_summary_file, case_types, output_file_path, state_dir):
+def main_with_args(case_summary_file, case_types, output_file_path, state_dir):
     """Do everything required to export and report on commcare export
     Args:
         case_summary_file (str): File path to CommCare app case summary
@@ -227,7 +226,7 @@ def main(case_summary_file, case_types, output_file_path, state_dir):
     wb.save(output_file_path)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--case-summary-file",
@@ -252,4 +251,6 @@ if __name__ == "__main__":
         dest="output_file_path",
     )
     args = parser.parse_args()
-    main(args.case_summary_file, args.case_types, args.output_file_path, args.state_dir)
+    main_with_args(
+        args.case_summary_file, args.case_types, args.output_file_path, args.state_dir
+    )

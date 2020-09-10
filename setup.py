@@ -10,19 +10,18 @@ setup(
     # license="MIT",   if/when we open source this, need to set right license type
     packages=["cc_utilities"],
     install_requires=[
-        # commcare-export is a dependency of this package and it's pinned at 2.5.12
-        # so we do this to avoid version conflict.
-        "openpyxl<=2.5.12",
+        "openpyxl",
         "requests",
-        "commcare-export",
         "pre-commit",
         "SQLAlchemy",
         "phonenumbers",
         "pandas",
     ],
-    scripts=[
-        "scripts/batch-process-contacts-for-can-receive-sms",
-        "scripts/generate-case-export-query-file",
-    ],
+    entry_points={
+        "console_scripts": [
+            "process-numbers-for-sms-capability=cc_utilities.command_line.process_numbers_for_sms_capability:main",
+            "generate-case-export-query-file=cc_utilities.command_line.generate_case_export_query_file:main",
+        ]
+    },
     zip_safe=False,
 )
