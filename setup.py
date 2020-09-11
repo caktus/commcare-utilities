@@ -8,7 +8,7 @@ setup(
     author="Benjamin White",
     author_email="ben@benjamineugenewhite.com",
     # license="MIT",   if/when we open source this, need to set right license type
-    packages=["cc_utilities"],
+    packages=["cc_utilities", "cc_utilities.command_line"],
     install_requires=[
         "openpyxl",
         "requests",
