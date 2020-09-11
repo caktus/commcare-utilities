@@ -15,7 +15,7 @@ setup(
         "SQLAlchemy",
         "phonenumbers",
         "pandas",
-    ],  # noqa
+    ],  # adding comment here because otherwise conflict b/w Flake8 and black in precommit hooks
     entry_points={
         "console_scripts": [
             "process-numbers-for-sms-capability=cc_utilities.command_line.process_numbers_for_sms_capability:main",
