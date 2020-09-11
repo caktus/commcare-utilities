@@ -1,4 +1,5 @@
 import argparse
+from math import ceil
 
 from cc_utilities.common import upload_data_to_commcare
 from cc_utilities.logger import logger
@@ -7,6 +8,12 @@ from cc_utilities.twilio_lookup import (
     get_unprocessed_contact_phone_numbers,
     process_contacts,
 )
+
+
+def chunk_list(lst, chunk_size):
+    """Yield successive `chunk_size` chunks from `lst`"""
+    for i in range(0, len(lst), chunk_size):
+        yield lst[i : i + chunk_size]
 
 
 def main_with_args(
@@ -32,28 +39,41 @@ def main_with_args(
             https://confluence.dimagi.com/display/commcarepublic/Bulk+Upload+Case+Data
 
     """
-    try:
-        unprocessed = get_unprocessed_contact_phone_numbers(db_url, search_column)
-        logger.info(f"{len(unprocessed)} unprocessed contacts found")
-        contacts_data = cleanup_processed_contacts_with_numbers(
-            process_contacts(unprocessed, search_column, twilio_sid, twilio_token,)
-        )
-    except Exception as exc:
-        logger.error(f"Something unexpected happened: {exc.message}")
-        raise exc
+    unprocessed = get_unprocessed_contact_phone_numbers(db_url, search_column)
+    logger.info(f"{len(unprocessed)} unprocessed contacts found")
+    chunk_size = 100
+    expected_batches = ceil(len(unprocessed) / chunk_size)
     logger.info(
-        f"Will attempt to upload SMS capability status for {len(contacts_data)} "
-        f"contacts to CommCare."
+        f"Processing contacts in {expected_batches} "
+        f"{'batch' if expected_batches == 1 else 'batches'} of {chunk_size} contacts "
+        f"per batch."
     )
-    upload_data_to_commcare(
-        contacts_data,
-        commcare_project_name,
-        "contact",
-        search_column,
-        commcare_user_name,
-        commcare_api_key,
-        "off",
-    )
+    for i, subset in enumerate(chunk_list(unprocessed, 100)):
+        batch_num = i + 1
+        logger.info(
+            f"Processing batch {batch_num} of {expected_batches} consisting of "
+            f"{len(subset)} contacts."
+        )
+        try:
+            contacts_data = cleanup_processed_contacts_with_numbers(
+                process_contacts(subset, search_column, twilio_sid, twilio_token,)
+            )
+        except Exception as exc:
+            logger.error(f"Something unexpected happened: {exc.message}")
+            raise exc
+        logger.info(
+            f"Uploading SMS capability status for {len(contacts_data)} contacts from "
+            f"batch {batch_num} of {expected_batches} to CommCare."
+        )
+        upload_data_to_commcare(
+            contacts_data,
+            commcare_project_name,
+            "contact",
+            search_column,
+            commcare_user_name,
+            commcare_api_key,
+            "off",
+        )
 
 
 def main():
