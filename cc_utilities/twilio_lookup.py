@@ -172,8 +172,8 @@ def get_unprocessed_contact_phone_numbers(db_url, search_column="id"):
     if has_can_sms_column:
         wheres.append(
             or_(
-                getattr(contact.cm, COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME).is_(None),
-                getattr(contact.cm, COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME)
+                getattr(contact.c, COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME).is_(None),
+                getattr(contact.c, COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME)
                 == COMMCARE_UNSET_CAN_SMS_LABEL,
             )
         )
