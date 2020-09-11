@@ -12,11 +12,10 @@ setup(
     install_requires=[
         "openpyxl",
         "requests",
-        "pre-commit",
         "SQLAlchemy",
         "phonenumbers",
         "pandas",
-    ],
+    ],  # noqa
     entry_points={
         "console_scripts": [
             "process-numbers-for-sms-capability=cc_utilities.command_line.process_numbers_for_sms_capability:main",
