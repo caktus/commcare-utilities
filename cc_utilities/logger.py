@@ -6,9 +6,11 @@ from pathlib import Path
 
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-log_file_path = os.environ.get(
-    "COMMCARE_UTILITIES_LOG_PATH",
-    Path(__file__).parent.absolute().joinpath("..", "logs"),
+log_file_path_from_env = os.environ.get("COMMCARE_UTILITIES_LOG_PATH")
+log_file_path = (
+    Path(log_file_path_from_env)
+    if log_file_path_from_env
+    else Path(__file__).parent.absolute().joinpath("..", "logs")
 )
 log_file_path.mkdir(parents=True, exist_ok=True)
 log_file = log_file_path.joinpath("cc-utilities.log")
