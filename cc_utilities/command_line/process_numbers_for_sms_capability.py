@@ -24,6 +24,7 @@ def main_with_args(
     twilio_sid,
     twilio_token,
     search_column,
+    batch_size=100,
 ):
     """The main routine
 
@@ -37,15 +38,17 @@ def main_with_args(
         search_column (str): : The name of the column in the db for contact that
             CommCare will match against in the bulk upload step. See
             https://confluence.dimagi.com/display/commcarepublic/Bulk+Upload+Case+Data
+        batch_size (int): The size to batch process requests in. Each batch_size batch
+            will be looked up in Twilio, and then script attempts to upload the
+            results for that batch to CommCare, before moving on to next batch.
 
     """
     unprocessed = get_unprocessed_contact_phone_numbers(db_url, search_column)
     logger.info(f"{len(unprocessed)} unprocessed contacts found")
-    chunk_size = 100
-    expected_batches = ceil(len(unprocessed) / chunk_size)
+    expected_batches = ceil(len(unprocessed) / batch_size)
     logger.info(
         f"Processing contacts in {expected_batches} "
-        f"{'batch' if expected_batches == 1 else 'batches'} of {chunk_size} contacts "
+        f"{'batch' if expected_batches == 1 else 'batches'} of {batch_size} contacts "
         f"per batch."
     )
     for i, subset in enumerate(chunk_list(unprocessed, 100)):
