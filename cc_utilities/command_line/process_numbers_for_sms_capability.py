@@ -51,7 +51,7 @@ def main_with_args(
         f"{'batch' if expected_batches == 1 else 'batches'} of {batch_size} contacts "
         f"per batch."
     )
-    for i, subset in enumerate(chunk_list(unprocessed, 100)):
+    for i, subset in enumerate(chunk_list(unprocessed, batch_size)):
         batch_num = i + 1
         logger.info(
             f"Processing batch {batch_num} of {expected_batches} consisting of "
