@@ -2,6 +2,8 @@ import time
 
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 from .constants import BULK_UPLOAD_URL, COMMCARE_UPLOAD_STATES
 from .logger import logger
@@ -22,11 +24,16 @@ def upload_data_to_commcare(
     cc_api_key,
     create_new_cases="on",
     search_field="case_id",
+    request_timeout=30,
 ):
-    url = BULK_UPLOAD_URL.format(project_slug)
+    retry_strategy = Retry(
+        total=3, backoff_factor=6, status_forcelist=[500], method_whitelist=["POST"]
+    )
     headers = {
         "Authorization": f"ApiKey {cc_username}:{cc_api_key}",
     }
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    url = BULK_UPLOAD_URL.format(project_slug)
     fieldnames = data[0].keys()
     assert (
         search_column in fieldnames
@@ -46,8 +53,13 @@ def upload_data_to_commcare(
         search_field=search_field,
         create_new_cases=create_new_cases,
     )
-
-    response = requests.post(url, headers=headers, files=files, data=body, timeout=5)
+    with requests.Session() as session:
+        session.headers.update(headers)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        req = requests.Request("POST", url, data=body, files=files)
+        prepped = session.prepare_request(req)
+        response = session.send(prepped, timeout=request_timeout)
     if not response.ok:
         message = "Something went wrong uploading data to CommCare"
         info = {
@@ -61,7 +73,7 @@ def upload_data_to_commcare(
         logger.info(f"Sleeping {seconds} seconds and checking upload status...")
         time.sleep(seconds)
         response_ = requests.get(
-            response.json()["status_url"], headers=headers, timeout=2
+            response.json()["status_url"], headers=headers, timeout=request_timeout
         )
         if response_.json()["state"] == COMMCARE_UPLOAD_STATES["success"]:
             logger.info("Succesfully uploaded. All done.")
