@@ -1,19 +1,13 @@
 import argparse
 from math import ceil
 
-from cc_utilities.common import upload_data_to_commcare
+from cc_utilities.common import chunk_list, upload_data_to_commcare
 from cc_utilities.logger import logger
 from cc_utilities.twilio_lookup import (
     cleanup_processed_contacts_with_numbers,
     get_unprocessed_contact_phone_numbers,
     process_contacts,
 )
-
-
-def chunk_list(lst, chunk_size):
-    """Yield successive `chunk_size` chunks from `lst`"""
-    for i in range(0, len(lst), chunk_size):
-        yield lst[i : i + chunk_size]
 
 
 def main_with_args(

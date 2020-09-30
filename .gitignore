@@ -11,3 +11,4 @@ logs
 .eggs
 __pycache__/
 .tox/
+.python-version
