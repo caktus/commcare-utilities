@@ -43,7 +43,7 @@ def get_commcare_case(
         }
         logger.error(message)
         raise CommCareUtilitiesError(message, info)
-    return response
+    return response.json()
 
 
 def get_commcare_cases(
@@ -149,7 +149,6 @@ def upload_data_to_commcare(
             response.json()["status_url"], headers=headers, timeout=request_timeout
         )
         errors = response_.json()["result"]["errors"]
-        logger.info(response_.json())
         if (
             response_.json()["state"] == COMMCARE_UPLOAD_STATES["success"]
             and len(errors) == 0
