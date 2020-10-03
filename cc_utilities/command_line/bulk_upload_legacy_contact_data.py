@@ -67,15 +67,25 @@ def main_with_args(
         "string"
     )
     logger.info("Validating columns in legacy contact data CSV against data dictionary")
-    validate_case_data_columns(
-        raw_case_data_df.columns,
-        data_dict.keys(),
-        [
-            key
-            for key in data_dict
-            if data_dict[key]["required"] in ("true", "True", "TRUE", True, 1, "1")
-        ],
-    )
+    if (
+        validate_case_data_columns(
+            raw_case_data_df.columns,
+            data_dict.keys(),
+            [
+                key
+                for key in data_dict
+                if data_dict[key]["required"] in ("true", "True", "TRUE", True, 1, "1")
+            ],
+        )
+        is False
+    ):
+        logger.error(
+            "Columns in case data were invalid, either because of unexpected column "
+            "names or because required column names were missing. Compare column "
+            "names to data dict expectations"
+        )
+        sys.exit(1)
+
     # Even though we converted to string above, there will still be NA values
     # so here we convert those to empty string when we pass in to the validation
     # function.

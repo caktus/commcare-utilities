@@ -5,8 +5,6 @@ from uuid import uuid4
 
 import dateparser
 import numpy as np
-import phonenumbers
-from phonenumbers import NumberParseException
 from retry import retry
 
 from cc_utilities.common import (
@@ -91,9 +89,7 @@ def validate_case_data_columns(column_names, allowed_columns, required_columns=N
         logger.error(msg)
         for problem in problems:
             logger.error(problem)
-        raise LegacyUploadError(
-            f"{msg}. See `.info` on this error for details.", problems
-        )
+        return False
     return True
 
 
@@ -306,19 +302,10 @@ def normalize_plain_field(raw_value):
     return raw_value.strip()
 
 
-def validate_phone_number_field(raw_value):
-    "Validate a value whose CommCare data type is `phone_number`"
-    if raw_value.strip() == "":
-        return True
-    try:
-        number = phonenumbers.parse(raw_value, region="US")
-        return phonenumbers.is_possible_number(number)
-    except NumberParseException:
-        return False
-
-
 def validate_number_field(raw_value):
     "Validate a value whose CommCare data type is `number`"
+    if raw_value == "":
+        return True
     try:
         int(raw_value)
         return True
@@ -352,13 +339,13 @@ def normalize_date_field(validated_raw_value):
 
 def validate_select_field(value, accepted_values):
     "Validate a value whose CommCare data type is `select`"
-    return any(value == "", value in accepted_values)
+    return any([value == "", value.strip() in accepted_values])
 
 
 def validate_multi_select_field(raw_value, accepted_values):
     "Validate a value whose CommCare data type is `multi_select`"
-    values = [val.strip() for val in "".split(raw_value)]
-    return any(len(values) == 0, set(values).issubset(set(accepted_values)))
+    values = [val.strip() for val in raw_value.split(",")]
+    return any([len(values) == 0, set(values).issubset(set(accepted_values))])
 
 
 def get_validation_fn(col_name, data_dict):
@@ -386,8 +373,11 @@ def get_validation_fn(col_name, data_dict):
         raise LookupError(msg)
     if col_type == "plain":
         return lambda val: True
+    # there's no good way to validate phone numbers unless users supply country code
+    # and that is unlikely for our use case.  Alternatively, we could parse only for US
+    # numbers, but contacts might have non-US phone numbers.
     if col_type == "phone_number":
-        return validate_phone_number_field
+        return lambda x: True
     if col_type == "number":
         return validate_number_field
     if col_type == "date":
@@ -396,7 +386,7 @@ def get_validation_fn(col_name, data_dict):
         return lambda val: validate_select_field(
             val, data_dict[col_name]["accepted_values"]
         )
-    if col_type == "multi-select":
+    if col_type == "multi_select":
         return lambda val: validate_multi_select_field(
             val, data_dict[col_name]["accepted_values"]
         )
@@ -417,14 +407,16 @@ def validate_legacy_case_data(df, data_dict):
     # helper function for accumulating validation problems across columns for a given
     # row
     def _accumulate_row_validation_problems(row, colname):
-        if row["validation_problems"]:
-            return ", ".join(
-                [row["validation_probelms"], f"Invalid value for {colname}"]
-            )
+        msg = f"Invalid value for {colname}"
+        return (
+            ", ".join([row["validation_problems"], msg])
+            if row["validation_problems"]
+            else msg
+        )
 
     df = df.copy(deep=True)
     df["is_valid"] = True
-    df["validation_problems"] = ""
+    df["validation_problems"] = None
     for col in df.drop(["is_valid", "validation_problems"], axis=1).columns:
         df["tmp_col_is_valid"] = df[col].apply(get_validation_fn(col, data_dict))
         df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
@@ -467,7 +459,7 @@ def get_normalization_fn(col_name, data_dict):
     if col_type == "date":
         return normalize_date_field
     if col_type in ("select", "multi-select", "phone_number"):
-        return lambda val: val
+        return lambda val: val.strip()
 
 
 def normalize_legacy_case_data(validated_df, data_dict, ignore_columns=None):
