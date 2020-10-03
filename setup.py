@@ -10,7 +10,7 @@ setup(
     # license="MIT",   if/when we open source this, need to set right license type
     packages=["cc_utilities", "cc_utilities.command_line"],
     install_requires=[
-        "backoff",
+        "retry",
         "dateparser",
         "openpyxl",
         "requests",
