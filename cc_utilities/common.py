@@ -139,7 +139,7 @@ def upload_data_to_commcare(
             f"Status code: {response.status_code} | Reason: {response.reason} "
         )
         info = {
-            "commcare_response_reason": response.reson,
+            "commcare_response_reason": response.reason,
             "commcare_response_status_code": response.status_code,
             "commcare_response_text": response.text,
         }
