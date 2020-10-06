@@ -134,8 +134,12 @@ def upload_data_to_commcare(
         response = session.send(prepped, timeout=request_timeout)
 
     if not response.ok:
-        message = "Something went wrong uploading data to CommCare"
+        message = (
+            f"Something went wrong uploading data to CommCare: "
+            f"Status code: {response.status_code} | Reason: {response.reason} "
+        )
         info = {
+            "commcare_response_reason": response.reson,
             "commcare_response_status_code": response.status_code,
             "commcare_response_text": response.text,
         }
