@@ -1,4 +1,5 @@
 import random
+from uuid import uuid4
 
 import pandas as pd
 from faker import Faker
@@ -6,6 +7,7 @@ from faker import Faker
 from cc_utilities.legacy_upload import (
     create_dummy_patient_case_data,
     generate_commcare_contact_data,
+    generate_commcare_external_id,
     validate_case_data_columns,
     validate_legacy_case_data,
 )
@@ -47,7 +49,7 @@ CONTACT_DATA_DICT = {
     },
     "symptoms_selected": {
         "group": None,
-        "required": True,
+        "required": False,
         "accepted_values": ["none", "fever", "chills", "headache"],
         "data_type": "multi_select",
     },
@@ -184,6 +186,24 @@ class TestCaseDataValidationLogic:
         assert ~df.iloc[change_row]["is_valid"]
         assert multi_select_col in df.iloc[change_row]["validation_problems"]
 
+    def test_validate_legacy_case_data_missing_required_value(self):
+        """Show that case data rows with missing required fields are invalid...
+
+        and row["validation_problems"] has info about the offending column(s)
+        """
+        change_row_1 = 0
+        change_row_2 = 1
+        required_col = "first_name"
+        assert CONTACT_DATA_DICT[required_col]["required"] is True
+        data = make_legacy_contacts_data()
+        data[change_row_1][required_col] = None
+        data[change_row_2][required_col] = ""
+        df = pd.DataFrame(data)
+        df = validate_legacy_case_data(df, CONTACT_DATA_DICT)
+        assert ~df.iloc[[change_row_1, change_row_2]]["is_valid"].all()
+        assert required_col in df.iloc[change_row_1]["validation_problems"]
+        assert required_col in df.iloc[change_row_2]["validation_problems"]
+
     def test_validate_case_data_columns_happy_path(self):
         "When given valid col names, `validate_case_data_columns` is True"
         df = pd.DataFrame(make_legacy_contacts_data())
@@ -226,11 +246,53 @@ class TestCaseDataValidationLogic:
         )
 
 
+class MockCommCareUploadFunctionsForUploadContacts:
+    def __init__(self):
+        super().__init__(MockCommCareUploadFunctionsForUploadContacts)
+        self.parent_id_contact_map = {}
+        self.parent_id_case_id_map = {}
+
+    def mock_upload_data_to_commcare(
+        self, data, project_slug, case_type, *args, **kwargs
+    ):
+        if case_type == "contact":
+            for contact in data:
+                if contact["parent_id"] in self.parent_id_contact_map:
+                    self.parent_id_contact_map[
+                        contact["parent_id"][contact["contact_id"]]
+                    ] = None
+                else:
+                    self.parent_id_contact_map[contact["parent_id"]] = {
+                        contact["contact_id"]: uuid4()
+                    }
+        if case_type == "patient":
+            for patient in data:
+                if patient["external_id"] in self.parent_id_case_id_map:
+                    continue
+                else:
+                    self.parent_id_case_id_map[patient["external_id"]] = str(uuid4())
+
+    def mock_get_commcare_case(self, parent_id, *args, **kwargs):
+        case = self.parent_id_case_id_map[parent_id]
+        return case
+
+
+def mock_generate_cc_dummy_patient_cases(
+    project_slug, cc_user_name, cc_api_key, num_dummies=1
+):
+    return [generate_commcare_external_id() for i in range(num_dummies)]
+
+
 class TestUploadLegacyContactsToCommCare:
     """Test logic around validating user-supplied case data"""
 
-    def test_happy_path(self):
-        pass
+    def test_happy_path(self, monkeypatch):
+        monkeypatch.setattr(
+            "cc_utilities.legacy_upload.generate_cc_dummy_patient_cases",
+            mock_generate_cc_dummy_patient_cases,
+        )
+        # data = make_legacy_contacts_data()
+        # return data
 
     def test_unhappy_path_still_returns_contacts_created_so_far(self):
         pass
