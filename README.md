@@ -8,6 +8,18 @@
 
 This repo is for an assortment of scripts for developers working with Commcare.
 
+- [commcare-utilities](#commcare-utilities)
+  - [Setup](#setup)
+  - [Tests](#tests)
+  - [Scripts](#scripts)
+    - [`generate-case-export-query-file`](#generate-case-export-query-file)
+    - [`process-numbers-for-sms-capability`](#process-numbers-for-sms-capability)
+    - [`bulk-upload-legacy-contact-data`](#bulk-upload-legacy-contact-data)
+      - [The workflow](#the-workflow)
+      - [Creating the data dict](#creating-the-data-dict)
+      - [Running the script](#running-the-script)
+  - [Logging](#logging)
+
 ## Setup
 
 1. Create and source a virtual environment.
@@ -66,6 +78,66 @@ Finally, note that this script presently is configured to work with US-based pho
 4. Optionally, copy over `sample.env` to `.env` and insert appropriate values. Source those values before the next step.
 5. Run the script. Assuming the referenced variables are set: `process-numbers-for-sms-capability --db $DB_URL --username $COMMCARE_USER --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT --twilioSID $TWILIO_SID --twilioToken $TWILIO_TOKEN`.
 6. Any new columns added to the DB will be noted in the command-line output of the script.
+
+
+### `bulk-upload-legacy-contact-data`
+
+This script allows a user to bulk upload legacy contact data into a CommCare project. Its input is a CSV of contacts to be imported, where each column in the CSV is a valid CommCare field for the project instance, along with a data dictionary CSV which is used to validate the contct data to be uploaded.
+
+
+#### The workflow
+
+At a high-level, this script is intended to support the following workflow:
+
+1. A non-technical stakeholder (for instance a point of contact at a public health agency) creates a CSV file (or an Excel file that will later be transformed into a CSV) containing a row for each legacy contact they want to import. In creating this asset, they should consult the data dictionary in their CommCare instance to determine which fields they would like to upload. Ultimately, the column names in the CSV will need to correspond to non-deprecated field names in their dictionary. For any column/row combination, the values supplied will be validated according to the data type of the column and the user-supplied value.  After producing this asset, the non-technical stakeholder shares it with a technical stakeholder who has API access to the CommCare instance.
+2. The technical stakeholder produces a data dictionary CSV, which is based on but modifies the data dictionary export available in CommCare instances. Ultimately, the tehcnical stakeholder will need to create a data dict csv with the following column headers: `field`, `allowed_values`, `data_type` and `required`. Detailed instructions on how to produce this asset are found in the next subsection. Once created, this asset will need to be stored on the same computer that is being used to run this script.
+3. The technical stakeholder runs the legacy upload script pointing to the legacy contact data and the data dictionary.
+4. The script checks to see that only expected column names were encountered, and whether any required column names were missing. If it encounters problems with the columns, this will be logged. The technical stakeholder will then fix these problems if they are obvious (say a misspelled column name) or else reach out to the non-technical stakeholder who provided the data and ask them to resolve the issue and provide updated data.
+5. Assuming the previous validation succeeds, the script next validates each row of data. It does this by cross-referencing the column name of each row value against the data dictionary in order to determine the data type and in the case of select and multi-select data types, the allowed values. The script outputs an Excel file with all of the original data plus 2 new columns: `is_valid` which will contain a boolean indicating whether or not the row validated; and `validation_problems` which will be text describing any validation problems encountered for the row.
+6. If row-level validation problems were encountered, the script will exit after creating the validation report. Depending on the problems encountered, the technical user may fix them on their own (say, for instance, for a select field whose values are "yes", "no", and "maybe", there is a row where the typo "yess" appears), or they may return the validation report back to the original user who uploaded the data, asking them to fix the reported issues.
+7. If no validation problems are encountered, the script normalizes row values (for instance, converting date columns to the formatting expected by CommCare).
+8. The next processes contacts in batches of 100. Legacy contacts must be attached to a parent case, and for this, the script creates a stub patient that gets to attached to a batch of up to 100 contacts. For a given batch of <= 100 contacts, the script creates a stub patient, retrieves it via the API to grab the case_id, reuploads the patient to the API to mark it as closed (this has to be done as a separate step), then uploads the batch of contacts to CommCare, setting the stub patient's case_id as the parent_id field for each of these contacts. Finally, for each batch, the stub patient gets retrieved again along with its children, which in this case are contacts. This data is then used to generate a URL where each newly created contact can be viewed in CommCare.
+9. After processing all of the contacts, the script outputs a final report Excel file, which contains all of the originally uploaded data, plus two additional columns: `contact_creation_success` and `commcare_contact_case_url`. The former is a boolean indicating if the row was uploaded, and the latter is a URL where the newly created contact can be viewed in CommCare.
+10. After this is all done, the technical stakeholder should share the final report with the non-technical stakeholder and let them know that there contacts have been uploaded.
+
+#### Creating the data dict
+
+When running this script, the user-supplied contact data will be validated against a data dictionary, which the technical stakeholder will need to produce. The rows in this CSV are comprised of the complete set of non-deprecated CommCare contact fields that the non-technical stakeholder might upload.
+
+The following columns must appear in the data dictionary CSV:
+
+- `field`: The name of a CommCare field. This must appear for any given row.
+- `data_type`: The datatype of the CommCare field. This is pulled from the data dictionary. The acceptable values are `plain`, `number`, `date`, `phone_number`, `select`, and `multi_select`. Note that in the original CommCare data dictionary that gets downloaded from the dashboard, the `multi_select` data type does not appear as a distinct data type. This value is to be used for rows marked as `select` in the original CommCare data dictionary where the description indicates that more than 1 value can be selected. We break this out as a separate data type for the purposes of this script because different validation rules are required.
+- `allowed_values`: For rows with the `select` or `multi_select` data type, this field needs to be supplied. The value should be a comma-space (`, `) separated list of allowed values. For instance, for a select field with the options "yes", "no", and "unknown", this would be rendered as `yes, no, unknown` in the `allowed_values` field for the row.
+- `required`: This field is optional. If one of the following values are provided, the field will be treated as required: `True`, `TRUE`, `true`, `1`. When a field is marked as required, the script will raise an error if the required column is missing in the legacy contact data.
+
+Here are the steps to create this asset:
+
+1. Export the data dictionary from the CommCare instance as an Excel file.
+2. Open this asset in a spreadsheet program.
+3. Make sure you are in the contact tab of the spreadsheet, as it will also contain any other case types for the CommCare instance.
+4. Rename the "Case Property" column header to "field".
+5. Delete the column with the header "Group".
+6. Get rid of rows that have deprecated case property values. To do this, filter the "Deprecated" column to True values, and then delete those rows. Remove the filter, and delete the "Deprecated" column.
+7. For each remaining row, confirm that it has a data type defined. If it does not, reach out to a relevant person at DiMagi to resolve this issue.
+8. Create a new column with the header "allowed_values".
+9. Rename the column header that currently reads "Data Type" to "data_type".
+10. Put a filter on the "data_type" column, and filter down to only rows with the "select" type. For each of these rows, you will need to look at the description field and pull out the allowed values. Reformat these as a comma-space (`, `) separated list int he adjacent "allowed_values" column for that row. For instance, if the allowed values are "yes", "no", and "maybe", you would put `yes, no, maybe` in the "allowed_values" column.  **Additionally, check if the values are indicated to be "multi select" in the description field. In that case, change the data type for this row to `multi_select`, as this will trigger different validation logic in the script.
+11. Turn off the filter on the "data_type" column.
+12. Delete the "Description" column.
+13. Add a column with the header `required`.
+14. If you want any properties to be required, mark them as `True` in the `required` column.
+15. Export as CSV and save on same computer that will be running the script.
+
+#### Running the script
+
+Assuming you have sourced the appropriate environment variables and that you have the data dictionary CSV and legacy contact data CSV as described above, the following command will run the script:
+
+```linux
+bulk-upload-legacy-contact-data --username $COMMCARE_USER --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT_NAME --caseDataPath <path-to-contact-data-to-be-uploaded> --dataDictPath <path-to-data-dict> --reportingPath <path-where-reporting-assets-will-be-created> --contactKeyValDict '{"additionalID": "additionalValue"}'
+```
+
+Note that the `--contactKeyValDict` is an optional argument. Any key-value pairs provided for this option will be added to all contacts created by the script.
 
 ## Logging
 
