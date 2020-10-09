@@ -337,15 +337,15 @@ def normalize_date_field(validated_raw_value):
     return parsed.strftime("%Y-%m-%d")
 
 
-def validate_select_field(value, accepted_values):
+def validate_select_field(value, allowed_values):
     "Validate a value whose CommCare data type is `select`"
-    return any([value == "", value.strip() in accepted_values])
+    return any([value == "", value.strip() in allowed_values])
 
 
-def validate_multi_select_field(raw_value, accepted_values):
+def validate_multi_select_field(raw_value, allowed_values):
     "Validate a value whose CommCare data type is `multi_select`"
     values = [val.strip() for val in raw_value.split(",")]
-    return any([len(values) == 0, set(values).issubset(set(accepted_values))])
+    return any([len(values) == 0, set(values).issubset(set(allowed_values))])
 
 
 def get_validation_fn(col_name, data_dict):
@@ -384,11 +384,11 @@ def get_validation_fn(col_name, data_dict):
         return validate_date_field
     if col_type == "select":
         return lambda val: validate_select_field(
-            val, data_dict[col_name]["accepted_values"]
+            val, data_dict[col_name]["allowed_values"]
         )
     if col_type == "multi_select":
         return lambda val: validate_multi_select_field(
-            val, data_dict[col_name]["accepted_values"]
+            val, data_dict[col_name]["allowed_values"]
         )
 
 
