@@ -97,6 +97,7 @@ def upload_data_to_commcare(
     create_new_cases="on",
     search_field="case_id",
     request_timeout=30,
+    file_name_prefix="",
 ):
     retry_strategy = Retry(
         total=3, backoff_factor=6, status_forcelist=[500], method_whitelist=["POST"]
@@ -113,7 +114,7 @@ def upload_data_to_commcare(
     df = pd.DataFrame(data)
     files = {
         "file": (
-            f"{case_type}.csv",
+            f"{file_name_prefix}{case_type}.csv",
             df.to_csv(index=False),
             "application/csv",
             {"charset": "UTF-8"},

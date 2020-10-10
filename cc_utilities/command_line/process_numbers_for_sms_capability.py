@@ -70,6 +70,7 @@ def main_with_args(
             commcare_user_name,
             commcare_api_key,
             "off",
+            file_name_prefix="twilio_sms_capability_",
         )
 
 
