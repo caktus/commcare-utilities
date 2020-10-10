@@ -108,7 +108,6 @@ def load_data_dict(data_dict_path):
         reader = csv.DictReader(fl)
         data_dict = {
             item["field"]: {
-                "group": item["group"],
                 "allowed_values": [
                     i.strip() for i in item["allowed_values"].split(",")
                 ],
@@ -237,6 +236,7 @@ def upload_legacy_contacts_to_commcare(
         f"{'batch' if expected_batches == 1 else 'batches'} of "
         f"{MAX_CONTACTS_PER_PARENT_PATIENT} contacts per batch."
     )
+
     created_contacts = []
 
     for i, batch in enumerate(
@@ -480,7 +480,7 @@ def get_normalization_fn(col_name, data_dict):
         return normalize_number_field
     if col_type == "date":
         return normalize_date_field
-    if col_type in ("select", "multi-select", "phone_number"):
+    if col_type in ("select", "multi_select", "phone_number"):
         return lambda val: val.strip()
 
 

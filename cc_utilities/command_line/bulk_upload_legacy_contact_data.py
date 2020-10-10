@@ -7,6 +7,7 @@ from pathlib import Path, PurePath
 import pandas as pd
 
 from cc_utilities.legacy_upload import (
+    LegacyUploadError,
     generate_commcare_case_report_url,
     generate_commcare_external_id,
     load_data_dict,
@@ -16,6 +17,9 @@ from cc_utilities.legacy_upload import (
     validate_legacy_case_data,
 )
 from cc_utilities.logger import logger
+
+VALIDATION_REPORT_FILE_NAME_PART = "validation_report"
+FINAL_REPORT_FILE_NAME_PART = "final_report"
 
 
 def main_with_args(
@@ -79,12 +83,12 @@ def main_with_args(
         )
         is False
     ):
-        logger.error(
+        msg = (
             "Columns in case data were invalid, either because of unexpected column "
             "names or because required column names were missing. Compare column "
             "names to data dict expectations"
         )
-        sys.exit(1)
+        raise LegacyUploadError(msg)
 
     # Even though we converted to string above, there will still be NA values
     # so here we convert those to empty string when we pass in to the validation
@@ -94,7 +98,7 @@ def main_with_args(
     )
     case_data_df = validate_legacy_case_data(raw_case_data_df.fillna(""), data_dict)
     validation_report_name = (
-        f"{Path(legacy_case_data_path).stem}_validation_report_"
+        f"{Path(legacy_case_data_path).stem}_{VALIDATION_REPORT_FILE_NAME_PART}_"
         f"{datetime.now().strftime('%m-%d-%Y_%H-%M')}.xlsx"
     )
     validation_report_path = PurePath(reporting_path).joinpath(validation_report_name)
@@ -112,8 +116,8 @@ def main_with_args(
             f"is True. No case data will be uploaded. See details in the validation "
             f"report at {validation_report_path}."
         )
-        logger.warn(msg)
-        sys.exit(1)
+        logger.error(msg)
+        raise LegacyUploadError(msg)
 
     # We generate this value in this context as it allows us to match up our original
     # data with results from the CommCare API and produce a report in which we
@@ -167,7 +171,7 @@ def main_with_args(
         on="contact_id",
     )
     final_report_name = (
-        f"{Path(legacy_case_data_path).stem}_final_report_"
+        f"{Path(legacy_case_data_path).stem}_{FINAL_REPORT_FILE_NAME_PART}_"
         f"{datetime.now().strftime('%m-%d-%Y_%H-%M')}.xlsx"
     )
     final_report_path = PurePath(reporting_path).joinpath(final_report_name)
@@ -175,7 +179,6 @@ def main_with_args(
     logger.info(f"Generating a final report at {final_report_path}")
     final_df.to_excel(final_report_path, index=False)
     logger.info("I am quite done now.")
-    sys.exit(0)
 
 
 def main():
@@ -214,12 +217,16 @@ def main():
         type=json.loads,
     )
     args = parser.parse_args()
-    main_with_args(
-        args.commcare_user_name,
-        args.commcare_api_key,
-        args.commcare_project_name,
-        args.legacy_case_data_path,
-        args.data_dictionary_path,
-        args.reporting_path,
-        **args.contact_kwargs,
-    )
+    try:
+        main_with_args(
+            args.commcare_user_name,
+            args.commcare_api_key,
+            args.commcare_project_name,
+            args.legacy_case_data_path,
+            args.data_dictionary_path,
+            args.reporting_path,
+            **args.contact_kwargs,
+        )
+    except Exception:
+        sys.exit(1)
+    sys.exit(0)

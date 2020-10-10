@@ -1,13 +1,24 @@
+import csv
+import glob
 import random
+import tempfile
+from pathlib import PurePath
 from uuid import uuid4
 
 import pandas as pd
+import pytest
 from faker import Faker
 
+from cc_utilities.command_line.bulk_upload_legacy_contact_data import (
+    FINAL_REPORT_FILE_NAME_PART,
+    VALIDATION_REPORT_FILE_NAME_PART,
+    main_with_args,
+)
 from cc_utilities.legacy_upload import (
+    MAX_CONTACTS_PER_PARENT_PATIENT,
     create_dummy_patient_case_data,
     generate_commcare_contact_data,
-    generate_commcare_external_id,
+    upload_legacy_contacts_to_commcare,
     validate_case_data_columns,
     validate_legacy_case_data,
 )
@@ -17,63 +28,70 @@ fake = Faker("en_US")
 
 
 CONTACT_DATA_DICT = {
+    # fmt: off
     "first_name": {
-        "group": None,
         "required": True,
-        "accepted_values": [],
+        "allowed_values": [],
         "data_type": "plain",
     },
     "dob": {
-        "group": None,
         "required": False,
-        "accepted_values": [],
+        "allowed_values": [],
         "data_type": "date",
     },
+    # fmt: on
     "phone_work": {
-        "group": None,
         "required": False,
-        "accepted_values": [],
+        "allowed_values": [],
         "data_type": "phone_number",
     },
     "days_symptoms_lasted": {
-        "group": None,
         "required": False,
-        "accepted_values": [],
+        "allowed_values": [],
         "data_type": "number",
     },
     "current_smoker": {
-        "group": None,
         "required": False,
-        "accepted_values": ["yes", "no", "unknown"],
+        "allowed_values": ["yes", "no", "unknown"],
         "data_type": "select",
     },
     "symptoms_selected": {
-        "group": None,
         "required": False,
-        "accepted_values": ["none", "fever", "chills", "headache"],
+        "allowed_values": ["none", "fever", "chills", "headache"],
         "data_type": "multi_select",
     },
 }
 
 
+def contact_data_dict_to_list_of_dicts(data_dict=CONTACT_DATA_DICT):
+    "Convenience function used in testing command line script"
+    result = [{**data_dict[k], **{"field": k}} for k in data_dict]
+    for row in result:
+        row["allowed_values"] = ", ".join(row["allowed_values"])
+        row["required"] = str(row["required"])
+    return result
+
+
 def make_valid_contact():
+    "Create contact with randomly generated values that validate vs. CONTACT_DATA_DICT"
     return {
         "first_name": fake.first_name(),
         "dob": fake.date_of_birth(minimum_age=18, maximum_age=100).strftime("%Y/%m/%d"),
         "phone_work": fake.phone_number(),
         "days_symptoms_lasted": random.randint(2, 14),
         "current_smoker": random.choice(
-            CONTACT_DATA_DICT["current_smoker"]["accepted_values"]
+            CONTACT_DATA_DICT["current_smoker"]["allowed_values"]
         ),
         "symptoms_selected": ", ".join(
             random.choices(
-                CONTACT_DATA_DICT["symptoms_selected"]["accepted_values"], k=2
+                CONTACT_DATA_DICT["symptoms_selected"]["allowed_values"], k=2
             )
         ),
     }
 
 
 def make_legacy_contacts_data(num=10):
+    "Create `num` number of valid contacts"
     return [make_valid_contact() for i in range(num)]
 
 
@@ -164,7 +182,7 @@ class TestCaseDataValidationLogic:
         val = "what did you say?"
         data = make_legacy_contacts_data()
         data[change_row][select_col] = val
-        assert val not in CONTACT_DATA_DICT[select_col]["accepted_values"]
+        assert val not in CONTACT_DATA_DICT[select_col]["allowed_values"]
         df = pd.DataFrame(data)
         df = validate_legacy_case_data(df, CONTACT_DATA_DICT)
         assert ~df.iloc[change_row]["is_valid"]
@@ -180,7 +198,7 @@ class TestCaseDataValidationLogic:
         val = "floating"
         data = make_legacy_contacts_data()
         data[change_row][multi_select_col] = val
-        assert val not in CONTACT_DATA_DICT[multi_select_col]["accepted_values"]
+        assert val not in CONTACT_DATA_DICT[multi_select_col]["allowed_values"]
         df = pd.DataFrame(data)
         df = validate_legacy_case_data(df, CONTACT_DATA_DICT)
         assert ~df.iloc[change_row]["is_valid"]
@@ -246,53 +264,178 @@ class TestCaseDataValidationLogic:
         )
 
 
-class MockCommCareUploadFunctionsForUploadContacts:
-    def __init__(self):
-        super().__init__(MockCommCareUploadFunctionsForUploadContacts)
-        self.parent_id_contact_map = {}
-        self.parent_id_case_id_map = {}
+class MockCommCareFunctions:
+    """Monkeypatching monkey business to mock API responses from CommCare API...
 
-    def mock_upload_data_to_commcare(
-        self, data, project_slug, case_type, *args, **kwargs
-    ):
-        if case_type == "contact":
-            for contact in data:
-                if contact["parent_id"] in self.parent_id_contact_map:
-                    self.parent_id_contact_map[
-                        contact["parent_id"][contact["contact_id"]]
-                    ] = None
-                else:
-                    self.parent_id_contact_map[contact["parent_id"]] = {
-                        contact["contact_id"]: uuid4()
-                    }
-        if case_type == "patient":
+    as called across three functions in cc_utilities.common, across which state needs
+    to be simulated that would otherwise be stored on CommCareHQ.
+    """
+
+    patients = []
+    get_commcare_case_called = 0
+
+    @classmethod
+    def upload_data_to_commcare(cls, data, slug, case_type, *args, **kwargs):
+        if case_type == "patient" and not kwargs.get("create_new_cases"):
             for patient in data:
-                if patient["external_id"] in self.parent_id_case_id_map:
-                    continue
-                else:
-                    self.parent_id_case_id_map[patient["external_id"]] = str(uuid4())
+                case_id = uuid4().hex
+                cls.patients.append(
+                    dict(
+                        case_id=case_id,
+                        external_id=patient["external_id"],
+                        child_cases={},
+                    )
+                )
+            return
+        if case_type == "patient" and kwargs.get("create_new_cases") == "off":
+            return
+        if case_type == "contact":
+            parent_id = data[0]["parent_id"]
+            patient = next(
+                patient for patient in cls.patients if patient["case_id"] == parent_id
+            )
+            for idx, contact in enumerate(data):
+                patient["child_cases"][idx] = {
+                    "properties": {"contact_id": contact["contact_id"]},
+                    "case_id": uuid4().hex,
+                }
+            return
 
-    def mock_get_commcare_case(self, parent_id, *args, **kwargs):
-        case = self.parent_id_case_id_map[parent_id]
-        return case
+    @classmethod
+    def get_commcare_case(cls, case_id, *args, **kwargs):
+        if kwargs.get("error_after_first") is True:
+            cls.get_commcare_case_called += 1
+        if cls.get_commcare_case_called > 1:
+            raise Exception("Simulated server error")
+        return next(
+            patient for patient in cls.patients if patient["case_id"] == case_id
+        )
+
+    @classmethod
+    def get_commcare_cases(cls, *args, **kwargs):
+        return cls.patients
 
 
-def mock_generate_cc_dummy_patient_cases(
-    project_slug, cc_user_name, cc_api_key, num_dummies=1
-):
-    return [generate_commcare_external_id() for i in range(num_dummies)]
+@pytest.fixture
+def mock_upload_to_commcare(monkeypatch):
+    def mock(*args, **kwargs):
+        return MockCommCareFunctions.upload_data_to_commcare(*args, **kwargs)
+
+    monkeypatch.setattr("cc_utilities.legacy_upload.upload_data_to_commcare", mock)
+
+
+@pytest.fixture
+def mock_get_commcare_cases(monkeypatch):
+    def mock(*args, **kwargs):
+        return MockCommCareFunctions.get_commcare_cases(*args, **kwargs)
+
+    monkeypatch.setattr("cc_utilities.legacy_upload.get_commcare_cases", mock)
+
+
+@pytest.fixture
+def mock_get_commcare_case(monkeypatch):
+    def mock(*args, **kwargs):
+        return MockCommCareFunctions.get_commcare_case(*args, **kwargs)
+
+    monkeypatch.setattr("cc_utilities.legacy_upload.get_commcare_case", mock)
+
+
+@pytest.fixture
+def mock_get_commcare_case_exception_after_first_call(monkeypatch):
+    def mock(*args, **kwargs):
+        return MockCommCareFunctions.get_commcare_case(
+            error_after_first=True, *args, **kwargs
+        )
+
+    monkeypatch.setattr("cc_utilities.legacy_upload.get_commcare_case", mock)
 
 
 class TestUploadLegacyContactsToCommCare:
-    """Test logic around validating user-supplied case data"""
+    "Tests of the `upload_legacy_contacts_to_commcare` function"
 
-    def test_happy_path(self, monkeypatch):
-        monkeypatch.setattr(
-            "cc_utilities.legacy_upload.generate_cc_dummy_patient_cases",
-            mock_generate_cc_dummy_patient_cases,
+    def test_happy_path(
+        self, mock_upload_to_commcare, mock_get_commcare_case, mock_get_commcare_cases
+    ):
+        data = make_legacy_contacts_data(num=200)
+        for contact in data:
+            contact["contact_id"] = uuid4().hex
+
+        result = upload_legacy_contacts_to_commcare(data, "slug", "username", "apikey")
+        assert len(result) == len(data)
+        assert set([contact["contact_id"] for contact in data]) == set(result.keys())
+
+    def test_unhappy_path_still_returns_contacts_created_so_far(
+        self,
+        mock_upload_to_commcare,
+        mock_get_commcare_case_exception_after_first_call,
+        mock_get_commcare_cases,
+    ):
+        data = make_legacy_contacts_data(num=200)
+        for contact in data:
+            contact["contact_id"] = uuid4().hex
+        result = upload_legacy_contacts_to_commcare(data, "slug", "username", "apikey")
+        # our mock class is written such that it will succeed on first contact upload
+        # call, but on second will fail. Below proves that it still returns info
+        # about contacts uploaded so far.
+        assert len(result) == MAX_CONTACTS_PER_PARENT_PATIENT
+        assert len(result) + MAX_CONTACTS_PER_PARENT_PATIENT == len(data)
+
+
+def test_command_line_script_happy_path(
+    mock_upload_to_commcare, mock_get_commcare_case, mock_get_commcare_cases,
+):
+    "Test happy path of the command-line script for uploading legacy contacts"
+    data = make_legacy_contacts_data(num=200)
+    data_dict = contact_data_dict_to_list_of_dicts()
+    ad_hoc_contact_key_vals = {"foo": "bar"}
+    with tempfile.TemporaryDirectory() as data_dir, tempfile.TemporaryDirectory() as report_dir:
+        data_path = PurePath(data_dir).joinpath("contacts.csv")
+        data_dict_path = PurePath(data_dir).joinpath("data_dict.csv")
+        with open(data_path, "w") as data_fl:
+            field_names = [k for k in data[0]]
+            writer = csv.DictWriter(data_fl, fieldnames=field_names)
+            writer.writeheader()
+            for contact in data:
+                writer.writerow(contact)
+
+        with open(data_dict_path, "w") as data_dict_fl:
+            field_names = [k for k in data_dict[0]]
+            writer = csv.DictWriter(data_dict_fl, fieldnames=field_names)
+            writer.writeheader()
+            for item in data_dict:
+                writer.writerow(item)
+
+        main_with_args(
+            "user_name",
+            "api_key",
+            "my_project",
+            data_path,
+            data_dict_path,
+            report_dir,
+            **ad_hoc_contact_key_vals,
         )
-        # data = make_legacy_contacts_data()
-        # return data
+        validation_report_path = next(
+            fl
+            for fl in glob.glob(
+                str(
+                    PurePath(report_dir).joinpath(
+                        f"*{VALIDATION_REPORT_FILE_NAME_PART}*"
+                    )
+                )
+            )
+        )
+        validation_df = pd.read_excel(validation_report_path)
+        assert set(("is_valid", "validation_problems")).issubset(
+            set(validation_df.columns)
+        )
 
-    def test_unhappy_path_still_returns_contacts_created_so_far(self):
-        pass
+        final_report_path = next(
+            fl
+            for fl in glob.glob(
+                str(PurePath(report_dir).joinpath(f"*{FINAL_REPORT_FILE_NAME_PART}*"))
+            )
+        )
+        final_report_df = pd.read_excel(final_report_path)
+        assert set(("contact_creation_success", "commcare_contact_case_url")).issubset(
+            set(final_report_df.columns)
+        )
