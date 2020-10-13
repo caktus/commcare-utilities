@@ -101,10 +101,11 @@ def main_with_args(
     logger.info(
         "Validating row values in legacy contact data CSV against data dictionary"
     )
+    now_string = datetime.now().strftime("%m-%d-%Y_%H-%M")
     case_data_df = validate_legacy_case_data(raw_case_data_df.fillna(""), data_dict)
     validation_report_name = (
         f"{Path(legacy_case_data_path).stem}_{VALIDATION_REPORT_FILE_NAME_PART}_"
-        f"{datetime.now().strftime('%m-%d-%Y_%H-%M')}.xlsx"
+        f"{now_string}.xlsx"
     )
     validation_report_path = PurePath(reporting_path).joinpath(validation_report_name)
     report_df = raw_case_data_df.merge(
@@ -188,7 +189,7 @@ def main_with_args(
     )
     final_report_name = (
         f"{Path(legacy_case_data_path).stem}_{FINAL_REPORT_FILE_NAME_PART}_"
-        f"{datetime.now().strftime('%m-%d-%Y_%H-%M')}.xlsx"
+        f"{now_string}.xlsx"
     )
     final_report_path = PurePath(reporting_path).joinpath(final_report_name)
     final_df.drop(["contact_id"], inplace=True, axis=1)
