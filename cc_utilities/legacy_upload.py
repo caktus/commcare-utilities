@@ -185,7 +185,7 @@ def generate_cc_dummy_patient_cases(
     )
     # retrieve the dummies by contact id so we can get their case_ids, which we
     # will attach to contacts we later upload
-    cc_dummy_patients = get_commcare_cases_by_exernal_id_with_backoff(
+    cc_dummy_patients = get_commcare_cases_by_external_id_with_backoff(
         project_slug, cc_user_name, cc_api_key, external_id=external_id
     )
     return [patient["case_id"] for patient in cc_dummy_patients]
