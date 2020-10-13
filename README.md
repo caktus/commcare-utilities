@@ -111,7 +111,7 @@ The following columns must appear in the data dictionary CSV:
 - `field`: The name of a CommCare field. This must appear for any given row.
 - `data_type`: The datatype of the CommCare field. This is pulled from the data dictionary. The acceptable values are `plain`, `number`, `date`, `phone_number`, `select`, and `multi_select`. Note that in the original CommCare data dictionary that gets downloaded from the dashboard, the `multi_select` data type does not appear as a distinct data type. This value is to be used for rows marked as `select` in the original CommCare data dictionary where the description indicates that more than 1 value can be selected. We break this out as a separate data type for the purposes of this script because different validation rules are required.
 - `allowed_values`: For rows with the `select` or `multi_select` data type, this field needs to be supplied. The value should be a comma-space (`, `) separated list of allowed values. For instance, for a select field with the options "yes", "no", and "unknown", this would be rendered as `yes, no, unknown` in the `allowed_values` field for the row.
-- `required`: This field is optional. If one of the following values are provided, the field will be treated as required: `True`, `TRUE`, `true`, `1`. When a field is marked as required, the script will raise an error if the required column is missing in the legacy contact data.
+- `required`: This field is optional. If one of the following values are provided, the field will be treated as required: `True`, `TRUE`, `true`, `1`, `Yes`, `Y`, `YES`, `y`, `yes`. When a field is marked as required, the script will raise an error if the required column is missing in the legacy contact data.
 
 Here are the steps to create this asset:
 

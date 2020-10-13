@@ -78,7 +78,8 @@ def main_with_args(
             [
                 key
                 for key in data_dict
-                if data_dict[key]["required"] in ("true", "True", "TRUE", True, 1, "1")
+                if data_dict[key]["required"]
+                in ("true", "True", "TRUE", True, 1, "1", "yes", "Yes", "YES", "y", "Y")
             ],
         )
         is False
