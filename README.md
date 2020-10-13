@@ -87,6 +87,8 @@ This script allows a user to bulk upload legacy contact data into a CommCare pro
 
 #### The workflow
 
+> **NOTE** This workflow contains the exchange of sensitive PII, so security should be a key conern for all parties involved in preparing, exchanging, procesing this data. The person running this script should, amongst other things, aim to security risks by deleting input data and generated reports as soon as possible after uploading contacts. This person should also be clear with the non-technical stakeholder who is providing the data that security should be a top concern.
+
 At a high-level, this script is intended to support the following workflow:
 
 1. A non-technical stakeholder (for instance a point of contact at a public health agency) creates a CSV file (or an Excel file that will later be transformed into a CSV) containing a row for each legacy contact they want to import. In creating this asset, they should consult the data dictionary in their CommCare instance to determine which fields they would like to upload. Ultimately, the column names in the CSV will need to correspond to non-deprecated field names in their dictionary. For any column/row combination, the values supplied will be validated according to the data type of the column and the user-supplied value.  After producing this asset, the non-technical stakeholder shares it with a technical stakeholder who has API access to the CommCare instance.
