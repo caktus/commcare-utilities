@@ -34,7 +34,7 @@ class LegacyUploadError(Exception):
     backoff=2,
     logger=logger,
 )
-def get_commcare_cases_by_exernal_id_with_backoff(
+def get_commcare_cases_by_external_id_with_backoff(
     project_slug, cc_user_name, cc_api_key, external_id
 ):
     """Wraps `get_commcare_cases` with retry and backoff behavior
