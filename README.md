@@ -82,7 +82,7 @@ Finally, note that this script presently is configured to work with US-based pho
 
 ### `bulk-upload-legacy-contact-data`
 
-This script allows a user to bulk upload legacy contact data into a CommCare project. Its input is a CSV of contacts to be imported, where each column in the CSV is a valid CommCare field for the project instance, along with a data dictionary CSV which is used to validate the contct data to be uploaded.
+This script allows a user to bulk upload legacy contact data into a CommCare project. Its input is a CSV of contacts to be imported, where each column in the CSV is a valid CommCare field for the project instance, along with a data dictionary CSV which is used to validate the contact data to be uploaded.
 
 
 #### The workflow
