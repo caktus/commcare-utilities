@@ -50,7 +50,7 @@ def main_with_args(
     Args:
         commcare_user_name (str): The Commcare username (email address)
         commcare_api_key (str): A Commcare API key for the user
-        commcare_project_name (str): The Commcare project being exported from
+        commcare_project_name (str): The Commcare project to which contacts will be imported
         legacy_case_data_path (str): Path to a CSV containing contacts to be imported
         data_dictionary_path (str): Path to a CSV of a data dict used to validate user-
             supplied contact data. Note that this asset is based on but distinct from
