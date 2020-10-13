@@ -412,6 +412,7 @@ def test_command_line_script_happy_path(
             data_path,
             data_dict_path,
             report_dir,
+            prompt_user=False,
             **ad_hoc_contact_key_vals,
         )
         validation_report_path = next(

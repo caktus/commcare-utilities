@@ -30,6 +30,7 @@ def main_with_args(
     data_dictionary_path,
     reporting_path,
     reject_all_if_any_invalid_rows=True,
+    prompt_user=True,
     **contact_kwargs,
 ):
     """The main routine. Create CommCare contacts based on legacy contact data.
@@ -59,6 +60,9 @@ def main_with_args(
         reporting_path (str): A folder to output reports indicating what happened.
         reject_all_if_any_invalid_rows (bool): If `True`, if any rows in case data CSV
             contain invalid data, the entire routine will be halted.
+        prompt_user (bool): If true, user will be prompted to affirm moving forward
+            after data validation and normalization has succeeded. In testing, we need
+            this behavior to be suppressed, so this param is to support that use case.
         contact_kwargs (dict): Optional key/value pairs that will be added to each
             generated contact.
     """
@@ -133,6 +137,17 @@ def main_with_args(
     normalized_case_data_df = normalize_legacy_case_data(
         valid_df, data_dict, ignore_columns=["contact_id"]
     )
+    if prompt_user:
+        while True:
+            keep_going = input(
+                "Data validated and normalized. Do you want to continue to upload [y/n]"
+            )
+            if keep_going.lower() in ("y", "yes"):
+                break
+            if keep_going.lower() in ("n", "no"):
+                logger.info("Terminating `bulk_upload_contact_data`")
+                sys.exit(0)
+
     logger.info("Attempting to upload contacts to CommCare")
     created_contacts_dict = upload_legacy_contacts_to_commcare(
         normalized_case_data_df.to_dict(orient="records"),
