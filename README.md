@@ -12,6 +12,7 @@ This repo is for an assortment of scripts for developers working with Commcare.
   - [Setup](#setup)
   - [Tests](#tests)
   - [Scripts](#scripts)
+    - [`sync-commcare-case-type-to-db`](#sync-commcare-case-type-to-db)
     - [`generate-case-export-query-file`](#generate-case-export-query-file)
     - [`process-numbers-for-sms-capability`](#process-numbers-for-sms-capability)
     - [`bulk-upload-legacy-contact-data`](#bulk-upload-legacy-contact-data)
@@ -36,6 +37,11 @@ tox
 ```
 
 ## Scripts
+
+### `sync-commcare-case-type-to-db`
+
+- Note on needing to install db specific libraries for SQAl (psycopg2, pymysql, pyodbc)
+
 
 ### `generate-case-export-query-file`
 
