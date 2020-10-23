@@ -12,7 +12,7 @@ This repo is for an assortment of scripts for developers working with Commcare.
   - [Setup](#setup)
   - [Tests](#tests)
   - [Scripts](#scripts)
-    - [`sync-commcare-app-db`](#sync-commcare-app-db)
+    - [`sync-commcare-app-to-db`](#sync-commcare-app-to-db)
     - [`generate-case-export-query-file`](#generate-case-export-query-file)
     - [`process-numbers-for-sms-capability`](#process-numbers-for-sms-capability)
     - [`bulk-upload-legacy-contact-data`](#bulk-upload-legacy-contact-data)
@@ -38,7 +38,7 @@ tox
 
 ## Scripts
 
-### `sync-commcare-app-db`
+### `sync-commcare-app-to-db`
 
 This script allows a user to automatically backup one or more case types from a CommCareHQ project into a SQL database. It does so by calling the Application Structure API to retrieve data about all cases and their properties (past and present). Based on this data, it generates an Excel file mapping observed property names to target SQL db column names before calling `commcare-export` (a separate Python package maintained by DiMagi) as a subprocess with this Excel file as parameter. During this final step, there will be logs indicating any new table-column combinations that were added to the database.
 
