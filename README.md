@@ -41,7 +41,10 @@ tox
 ### `sync-commcare-case-type-to-db`
 
 - Note on needing to install db specific libraries for SQAl (psycopg2, pymysql, pyodbc)
-
+- What the asset files are.
+- Oddities around the columns that show up in the assets vs. db vs. those that are real but only show up when row with vals
+- Windows specific install instructions as separate file
+- about grabbing app id
 
 ### `generate-case-export-query-file`
 
