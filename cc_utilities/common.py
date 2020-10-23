@@ -1,8 +1,10 @@
+import re
 import time
 from urllib.parse import urljoin
 
 import pandas as pd
 import requests
+from openpyxl import Workbook
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
@@ -220,3 +222,54 @@ def chunk_list(lst, chunk_size):
     """Yield successive `chunk_size` chunks from `lst`"""
     for i in range(0, len(lst), chunk_size):
         yield lst[i : i + chunk_size]
+
+
+def make_sql_friendly(value, invalid_sql_chars=re.compile(r"[^\w]")):
+    """Some CommCare properties and case types include dashes, which make for
+    bothersome SQL queries. Remove any non-alphanumeric or underscore
+    characters, then return resulting value."""
+    # Do not substitute "-" with "_" because in at least once instance, that would
+    # result in a duplicate property name ("date_opened").
+    return invalid_sql_chars.sub("", value)
+
+
+def make_commcare_export_sync_xl_wb(mapping):
+    """Create an Excel workbook in format required for commcare-export script
+
+    NB: This does not save the workbook, and will need to call wb.save() on object
+    returned by this function in order to persist.
+
+
+    Args:
+        mapping (dict): Dictionary of lists of tuples of form
+            {"case_type": [("source_name", "target_name)]}
+
+    Returns:
+        obj: An Openpyxl workbook
+    """
+    sheet_headers = [
+        "Data Source",
+        "Filter Name",
+        "Filter Value",
+        "",
+        "Field",
+        "Source Field",
+    ]
+    wb = Workbook()
+    for idx, (case_type, source_target_mappings) in enumerate(mapping.items()):
+        if idx == 0:
+            ws = wb.active
+        else:
+            ws = wb.create_sheet()
+        ws.title = case_type
+        ws.append(sheet_headers)
+        ws["A2"] = "case"
+        ws["B2"] = "type"
+        ws["C2"] = case_type
+
+        row_offset = 2
+        for idx, item in enumerate(sorted(source_target_mappings, key=lambda x: x[1])):
+            row_num = idx + row_offset
+            # NOTE: Columns F, E are not in the order they appear in Excel (E, F)
+            ws[f"F{row_num}"], ws[f"E{row_num}"] = item
+    return wb

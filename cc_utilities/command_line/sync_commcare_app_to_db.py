@@ -6,61 +6,15 @@ import traceback
 from datetime import datetime
 from pathlib import PurePath
 
-from openpyxl import Workbook
-
-from cc_utilities.command_line.generate_case_export_query_file import make_sql_friendly
-from cc_utilities.common import get_application_structure
+from cc_utilities.common import (
+    get_application_structure,
+    make_commcare_export_sync_xl_wb,
+    make_sql_friendly,
+)
 from cc_utilities.constants import COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS
 from cc_utilities.logger import logger
 
 PARENT_PROPERTY_PREFIX = "parent/"
-
-
-def make_commcare_export_sync_xl_wb(mappings):
-    """Create an Excel workbook in format required for commcare-export script
-
-    NB: This does not save the workbook, and will need to call wb.save() on object
-    returned by this function in order to persist.
-
-    Args:
-        source_target_mappings (dict): dict of case types, and for each case type the
-            value is a dict of source field to target db column mappings
-    Returns:
-        obj: An Openpyxl workbook
-    """
-    sheet_headers = [
-        "Data Source",
-        "Filter Name",
-        "Filter Value",
-        "",
-        "Field",
-        "Source Field",
-        "Alternate Source Field 1",
-    ]
-    wb = Workbook()
-    for idx, case_type in enumerate(mappings):
-        if idx == 0:
-            ws = wb.active
-        else:
-            ws = wb.create_sheet()
-        ws.title = case_type
-        ws.append(sheet_headers)
-        ws["A2"] = "case"
-        ws["B2"] = "type"
-        ws["C2"] = case_type
-
-        row_offset = 2
-
-        for idx, item in enumerate(
-            sorted(
-                [(k, mappings[case_type][k]) for k in mappings[case_type]],
-                key=lambda x: x[0],
-            )
-        ):
-            row_num = idx + row_offset
-            ws[f"F{row_num}"], ws[f"E{row_num}"] = item
-
-    return wb
 
 
 def do_commcare_export_to_db(
@@ -117,6 +71,9 @@ def main_with_args(
     app_structure = get_application_structure(
         commcare_project_name, commcare_user_name, commcare_api_key, commcare_app_id
     )
+    import pdb
+
+    pdb.set_trace()
     cases_with_properties = {}
 
     for module in app_structure["modules"]:
@@ -166,13 +123,13 @@ def main_with_args(
 
     mappings = {}
     for case_type in cases_with_properties:
-        mappings[case_type] = {
-            **COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS,
-            **{
-                f"properties.{item}": make_sql_friendly(item)
+        mappings[make_sql_friendly(case_type)] = [
+            *COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS,
+            *[
+                (f"properties.{item}", make_sql_friendly(item))
                 for item in sorted(cases_with_properties[case_type])
-            },
-        }
+            ],
+        ]
     logger.info("Generating db sync mapping workbook")
     wb = make_commcare_export_sync_xl_wb(mappings)
     if mapping_workbook_path:
