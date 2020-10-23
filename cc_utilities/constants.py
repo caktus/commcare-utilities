@@ -2,6 +2,7 @@ BULK_UPLOAD_URL = "https://www.commcarehq.org/a/{}/importer/excel/bulk_upload_ap
 LIST_CASES_URL = "https://www.commcarehq.org/a/{}/api/v0.5/case/"
 CASE_REPORT_URL = "https://www.commcarehq.org/a/{}/reports/case_data/"
 APPLICATION_STRUCTURE_URL = "https://www.commcarehq.org/a/{}/api/v0.5/application/"
+APPLICATION_STRUCTURE_DEFAULT_TIMEOUT = 4 * 60  # seconds
 COMMCARE_CONTACT_PHONE_FIELD = "phone_home"
 COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME = "api_phone_home_sms_verification"
 COMMCARE_UPLOAD_STATES = dict(missing=-1, not_started=0, started=1, success=2, failed=3)

@@ -9,6 +9,7 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
 from .constants import (
+    APPLICATION_STRUCTURE_DEFAULT_TIMEOUT,
     APPLICATION_STRUCTURE_URL,
     BULK_UPLOAD_URL,
     COMMCARE_UPLOAD_STATES,
@@ -24,7 +25,7 @@ class CommCareUtilitiesError(Exception):
 
 
 def get_application_structure(
-    project_slug, cc_username, cc_api_key, app_id, request_timeout=180
+    project_slug, cc_username, cc_api_key, app_id, request_timeout=None
 ):
     """Retrieve data about a CommCare application's structure from the API
 
@@ -42,12 +43,15 @@ def get_application_structure(
         dict: A dict formed from the JSON returned by the response
 
     """
+    request_timeout = (
+        request_timeout if request_timeout else APPLICATION_STRUCTURE_DEFAULT_TIMEOUT
+    )
     url = urljoin(APPLICATION_STRUCTURE_URL.format(project_slug), app_id)
     data = dict(format="json",)
     headers = {
         "Authorization": f"ApiKey {cc_username}:{cc_api_key}",
     }
-    response = requests.get(url, headers=headers, params=data)
+    response = requests.get(url, headers=headers, params=data, timeout=request_timeout)
     if not response.ok:
         message = (
             f"Something went wrong retrieving app structure for app with id "

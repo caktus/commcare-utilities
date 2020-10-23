@@ -6,6 +6,8 @@ import traceback
 from datetime import datetime
 from pathlib import PurePath
 
+from openpyxl import load_workbook
+
 from cc_utilities.common import (
     get_application_structure,
     make_commcare_export_sync_xl_wb,
@@ -42,38 +44,40 @@ def do_commcare_export_to_db(
     subprocess.run(commands)
 
 
-def main_with_args(
+def get_mappings_from_app_structure(
+    commcare_project_name,
     commcare_user_name,
     commcare_api_key,
-    commcare_project_name,
     commcare_app_id,
-    db_url,
-    case_types,
-    mapping_workbook_path,
+    app_structure_api_timeout,
 ):
-    """The main routine.
+    """Get data about each case type and its known properties (historical and current)
+        from the Application Structure API.
 
     Args:
+
         commcare_user_name (str): The Commcare username (email address)
         commcare_api_key (str): A Commcare API key for the user
-        commcare_project_name (str): The Commcare project to which contacts will be imported
+        commcare_project_name (str): The Commcare project to which contacts will be
+            imported
         commcare_app_id (str): The ID of the Commcare app.
-        db_url (str): Connection string for the db
-        case_types (list): Optional. List of case types. If provided, only the provided
-            case types will be synced.
-        mapping_workbook_path (str):  Optional. If provided, the Excel workbook
-            containing source-target mappings will be saved in this folder.
+        app_structure_api_timeout (int): Optional. If provided will override default
+            timeout for the call to Application Structure API (
+            which tends to take a while)
+    Returns:
+        dict: Whose keys are case types and whose values are lists of property names
     """
     logger.info(
         f"Retrieving application structure for {commcare_project_name} with ID: "
-        f"{commcare_app_id}. This may take a while."
+        f"{commcare_app_id} from API. This may take a while."
     )
     app_structure = get_application_structure(
-        commcare_project_name, commcare_user_name, commcare_api_key, commcare_app_id
+        commcare_project_name,
+        commcare_user_name,
+        commcare_api_key,
+        commcare_app_id,
+        app_structure_api_timeout,
     )
-    import pdb
-
-    pdb.set_trace()
     cases_with_properties = {}
 
     for module in app_structure["modules"]:
@@ -100,6 +104,75 @@ def main_with_args(
                     ]
                 )
             )
+    return cases_with_properties
+
+
+def load_non_default_sources_from_workbook(mapping_path):
+    """Mimic the values returned by `get_mappings_from_app_structure` by loading
+        mapping data stored in a sourc-target mapping workbook.
+
+    Args:
+        mapping_path (str): Path to an Excel wb containing source target mappings,
+            likely originally created by in the workbook creation portion of
+            `main_with_args` below.
+    Returns:
+        dict: Whose keys are case types and whose values are lists of property names
+    """
+    wb = load_workbook(filename=mapping_path)
+    cases_with_source_fields = {}
+    for sheet in wb:
+        source_fields = list(
+            map(lambda cell: cell.value.replace("properties.", ""), sheet["F:F"])
+        )[1:]
+        source_fields = set(source_fields).difference(
+            set([item[0] for item in COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS])
+        )
+        cases_with_source_fields[sheet.title] = source_fields
+    return cases_with_source_fields
+
+
+def main_with_args(
+    commcare_user_name,
+    commcare_api_key,
+    commcare_project_name,
+    commcare_app_id,
+    db_url,
+    case_types,
+    existing_mapping_path,
+    mapping_storage_path,
+    app_structure_api_timeout,
+):
+    """The main routine.
+
+    Args:
+        commcare_user_name (str): The Commcare username (email address)
+        commcare_api_key (str): A Commcare API key for the user
+        commcare_project_name (str): The Commcare project to which contacts will be
+            imported
+        commcare_app_id (str): The ID of the Commcare app.
+        db_url (str): Connection string for the db
+        case_types (list): Optional. List of case types. If provided, only the provided
+            case types will be synced.
+        existing_mapping_path (str): Optional. Path to an existing Excel wb containing
+            source-target mappings. If provided, this asset will be used, and the
+            Application Structure API will not be called to get this data.
+        mapping_storage_path (str):  Optional. If provided, the Excel workbook
+            containing source-target mappings will be saved in this folder.
+        app_structure_api_timeout (int): Optional. If provided will override default
+            timeout for the call to Application Structure API (
+            which tends to take a while)
+    """
+    cases_with_properties = (
+        load_non_default_sources_from_workbook(existing_mapping_path)
+        if existing_mapping_path
+        else get_mappings_from_app_structure(
+            commcare_project_name,
+            commcare_user_name,
+            commcare_api_key,
+            commcare_app_id,
+            app_structure_api_timeout,
+        )
+    )
     unfound = list(
         set(case_types).difference(set([k for k in cases_with_properties.keys()]))
     )
@@ -116,25 +189,24 @@ def main_with_args(
             k: v for (k, v) in cases_with_properties.items() if k in case_types
         }
 
-    def _generate_standard_app_state_file_name(
-        date_part=datetime.now().strftime("%Y_%m_%d-%H_%M_%S"),
-    ):
-        return f"app-{commcare_app_id}-by-case-by-property_{date_part}.json"
-
     mappings = {}
     for case_type in cases_with_properties:
-        mappings[make_sql_friendly(case_type)] = [
-            *COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS,
-            *[
-                (f"properties.{item}", make_sql_friendly(item))
-                for item in sorted(cases_with_properties[case_type])
-            ],
-        ]
+        mappings[make_sql_friendly(case_type)] = list(
+            set(
+                [
+                    *COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS,
+                    *[
+                        (f"properties.{item}", make_sql_friendly(item))
+                        for item in sorted(cases_with_properties[case_type])
+                    ],
+                ]
+            )
+        )
     logger.info("Generating db sync mapping workbook")
     wb = make_commcare_export_sync_xl_wb(mappings)
-    if mapping_workbook_path:
+    if mapping_storage_path:
         wb.save(
-            PurePath(mapping_workbook_path).joinpath(
+            PurePath(mapping_storage_path).joinpath(
                 f"mappings-{datetime.now().strftime('%m_%d_%Y_%H-%M')}.xlsx"
             )
         )
@@ -176,9 +248,24 @@ def main():
         nargs="*",
     )
     parser.add_argument(
-        "--mapping-path",
+        "--existing-mapping-path",
+        help=(
+            "Optional. Path to xl wb containing existing source-target mapping. "
+            "If included, the script will not make a call to the Application Structure "
+            "API and will instead use the mappings contained in this file"
+        ),
+        dest="existing_mapping_path",
+    )
+    parser.add_argument(
+        "--mapping-storage-path",
         help="Optional. Path to folder to store source-target mapping workbook to",
-        dest="mapping_workbook_path",
+        dest="mapping_storage_path",
+    )
+    parser.add_argument(
+        "--app-structure-api-timeout",
+        help="Optional. Seconds for timeout for request to application structure API",
+        dest="app_structure_api_timeout",
+        type=int,
     )
     args = parser.parse_args()
     try:
@@ -189,7 +276,9 @@ def main():
             args.application_id,
             args.db_url,
             args.case_types,
-            args.mapping_workbook_path,
+            args.existing_mapping_path,
+            args.mapping_storage_path,
+            args.app_structure_api_timeout,
         )
     except Exception as exc:
         logger.error(exc)
