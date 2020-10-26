@@ -1,4 +1,5 @@
 import csv
+import traceback
 from math import ceil, log2
 from urllib.parse import urljoin
 from uuid import uuid4
@@ -160,10 +161,8 @@ def generate_cc_dummy_patient_cases(
     Returns:
         list: List comprised of `case_id`s for each created dummy patient case
     """
-    external_id = generate_commcare_external_id()
-    dummies_data = [
-        create_dummy_patient_case_data(external_id) for i in range(num_dummies)
-    ]
+    external_ids = [generate_commcare_external_id() for i in range(num_dummies)]
+    dummies_data = [create_dummy_patient_case_data(ext_id) for ext_id in external_ids]
     upload_data_to_commcare(
         dummies_data, project_slug, "patient", "case_id", cc_user_name, cc_api_key
     )
@@ -185,9 +184,13 @@ def generate_cc_dummy_patient_cases(
     )
     # retrieve the dummies by contact id so we can get their case_ids, which we
     # will attach to contacts we later upload
-    cc_dummy_patients = get_commcare_cases_by_external_id_with_backoff(
-        project_slug, cc_user_name, cc_api_key, external_id=external_id
-    )
+    cc_dummy_patients = []
+    for ext_id in external_ids:
+        cc_dummy_patients.extend(
+            get_commcare_cases_by_external_id_with_backoff(
+                project_slug, cc_user_name, cc_api_key, external_id=ext_id
+            )
+        )
     return [patient["case_id"] for patient in cc_dummy_patients]
 
 
@@ -287,9 +290,10 @@ def upload_legacy_contacts_to_commcare(
         # This will make it possible to remove rows that were succesfully uploaded from
         # the originally supplied data and try again later, without generating duplicate
         # case data in CommCare.
-        except Exception as exc:
+        except Exception:
             logger.error(
-                f"[upload_legacy_contacts_to_commcare] Something went wrong: {exc}"
+                f"[upload_legacy_contacts_to_commcare] Something went wrong: "
+                f"{traceback.format_exc()}"
             )
     result = {}
     for item in created_contacts:
