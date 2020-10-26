@@ -170,7 +170,7 @@ def upload_data_to_commcare(
             )
             msg = f"Something went wrong uploading data to CommCare: {errors_string}"
             logger.error(msg)
-            raise CommCareUtilitiesError(message)
+            raise CommCareUtilitiesError(msg)
 
 
 def chunk_list(lst, chunk_size):
