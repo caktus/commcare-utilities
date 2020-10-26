@@ -1,5 +1,4 @@
 import csv
-import traceback
 from math import ceil, log2
 from urllib.parse import urljoin
 from uuid import uuid4
@@ -291,10 +290,8 @@ def upload_legacy_contacts_to_commcare(
         # the originally supplied data and try again later, without generating duplicate
         # case data in CommCare.
         except Exception:
-            logger.error(
-                f"[upload_legacy_contacts_to_commcare] Something went wrong: "
-                f"{traceback.format_exc()}"
-            )
+            logger.error("[upload_legacy_contacts_to_commcare] Something went wrong")
+            logger.exception()
     result = {}
     for item in created_contacts:
         result[item[0]] = item[1]
