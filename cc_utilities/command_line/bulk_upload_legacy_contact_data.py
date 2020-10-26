@@ -245,7 +245,6 @@ def main():
             **args.contact_kwargs,
         )
     except Exception:
-        logger.error("[main] Something went wrong")
-        logger.exception()
+        logger.exception("[main] Something went wrong")
         sys.exit(1)
     sys.exit(0)

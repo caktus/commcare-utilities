@@ -290,8 +290,9 @@ def upload_legacy_contacts_to_commcare(
         # the originally supplied data and try again later, without generating duplicate
         # case data in CommCare.
         except Exception:
-            logger.error("[upload_legacy_contacts_to_commcare] Something went wrong")
-            logger.exception()
+            logger.exception(
+                "[upload_legacy_contacts_to_commcare] Something went wrong"
+            )
     result = {}
     for item in created_contacts:
         result[item[0]] = item[1]
