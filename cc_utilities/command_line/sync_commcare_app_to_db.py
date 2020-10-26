@@ -267,6 +267,31 @@ def main():
         dest="app_structure_api_timeout",
         type=int,
     )
+    parser.add_argument(
+        "--since",
+        help="Optional. Export all data after this date. Format YYYY-MM-DD",
+        dest="since",
+    )
+    parser.add_argument(
+        "--until",
+        help="Optional. Export all up until this date. Format YYYY-MM-DD",
+        dest="until",
+    )
+    parser.add_argument(
+        "--verbose",
+        help="If flag included, logs of the db sync will be verbose.",
+        dest="verbose",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--batch-size",
+        help=(
+            "Optional. Integer. If included, records will be streamed to the SQL "
+            "db in batches of this size"
+        ),
+        dest="batch_size",
+        default=5000,
+    )
     args = parser.parse_args()
     try:
         main_with_args(
@@ -279,6 +304,12 @@ def main():
             args.existing_mapping_path,
             args.mapping_storage_path,
             args.app_structure_api_timeout,
+            commcare_export_script_args=dict(
+                since=args.since,
+                until=args.until,
+                verbose=args.verbose,
+                batch_size=args.batch_size,
+            ),
         )
     except Exception as exc:
         logger.error(exc)
