@@ -1,6 +1,7 @@
 import argparse
 import json
 import sys
+import traceback
 from datetime import datetime
 from pathlib import Path, PurePath
 
@@ -245,5 +246,6 @@ def main():
             **args.contact_kwargs,
         )
     except Exception:
+        logger.error(f"Something went wrong: {traceback.format_exc()}")
         sys.exit(1)
     sys.exit(0)
