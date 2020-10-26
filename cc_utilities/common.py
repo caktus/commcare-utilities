@@ -153,6 +153,19 @@ def upload_data_to_commcare(
         response_ = requests.get(
             response.json()["status_url"], headers=headers, timeout=request_timeout
         )
+
+        if response_.json()["state"] == COMMCARE_UPLOAD_STATES["failed"]:
+            msg = (
+                f"Something went wrong uploading data to CommCare. Result state was "
+                f"{COMMCARE_UPLOAD_STATES['failed']}"
+            )
+            logger.error(msg)
+            raise CommCareUtilitiesError(msg, None)
+
+        if response_.json()["state"] != COMMCARE_UPLOAD_STATES["success"]:
+            logger.info("Upload not ready, will wait")
+            continue
+
         errors = response_.json()["result"]["errors"]
         if (
             response_.json()["state"] == COMMCARE_UPLOAD_STATES["success"]
@@ -170,7 +183,7 @@ def upload_data_to_commcare(
             )
             msg = f"Something went wrong uploading data to CommCare: {errors_string}"
             logger.error(msg)
-            raise CommCareUtilitiesError(message)
+            raise CommCareUtilitiesError(msg, errors)
 
 
 def chunk_list(lst, chunk_size):
