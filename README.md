@@ -44,6 +44,24 @@ This script allows a user to automatically backup one or more case types from a 
 
 While additional options are available, it's worth calling out two important, related command line arguments here: `--mapping-storage-path` and `--existing-mapping-path`. By providing an appropriate value for the `--mapping-storage-path` option, the script will save an Excel file containing the source-target mappings used in the `commcare-export` subprocess. This file allows a user to audit which column mappings were attempted to be synced. It also enables a user to re-use this resource in subsequent runs of the script by supplying a path to such a file with the `--existing-mapping-path` option. In this case, the script will not make a call to the Application Structure API and will instead rely on the earlier mappings captured in the Excel file. Because the Application Structure API endpoint takes a long time to return a response, this approach can be helpful, but keep in mind that the database will not learn about any new properties that have been added to a case type if it doesn't call the API.
 
+Available command line arguments and flags:
+
+- `--username`: Mandatory. The Commcare username (email address)****
+- `--api-key`: Mandatory. An API key associated with username
+- `--project`: Mandatory. The Commcare projecct name
+- `--app-id`: Mandatory. The ID of the Commcare app
+- `--db-url`: Mandatory. The URL string of the db to sync to
+- `--case-types`: Optional. Comma-separated list of case types to sync. If not included, all available case types will be synced.
+- `--existing-mapping-path`: Optional. Path to xl wb containing existing source-target mapping. If included, the script will not make a call to the Application Structure API and will instead use the mappings contained in this file.
+- `--app-structure-api-timeout` - Optional. Seconds for timeout for request to application structure API. Defaults to value stored in `constants.APPLICATION_STRUCTURE_DEFAULT_TIMEOUT`
+- `--since` - Optional. Export all data after this date. Format YYYY-MM-DD
+- `--until` - Optional. Export all data up until this date. Format YYYY-MM-DD
+- `--batch-size` - Optional. Integer. If included, records will be streamed to the SQL db in batches of this size
+- `--verbose` - If flag included, logs of the db sync will be verbose
+- `--users` - If flag included, export table with data about project's mobile workers
+- `--locations` - If flag included, export table with data about project's locations
+- `--with-organization` - If flag included, export tables containing mobile worker data and location data and add a commcare_userid field to any exported form or case
+
 Also noteworthy: When `commcare-export` encounters properties that do not have >=1 non-empty value in the source data, it will not add a column for that property type to the database. If on subsequent runs at least one case has been added with a non-null for the property, the property will be added as a column.
 
 **Before running the script**:
