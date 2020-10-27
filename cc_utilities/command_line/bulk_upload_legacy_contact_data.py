@@ -68,6 +68,14 @@ def main_with_args(
     """
     logger.info(f"Loading data dictionary at {data_dictionary_path}")
     data_dict = load_data_dict(data_dictionary_path)
+    assert all(
+        [field in data_dict for field in ("first_name", "last_name")]
+    ), "Data dict must contain `first_name` and `last_name` for contact upload"
+    # these must be present in order to enable creation of `name` property, which
+    # needs to be generated if not supplied in upload data
+    data_dict["first_name"]["required"] = True
+    data_dict["last_name"]["required"] = True
+
     # Pandas infers data types, and that's not helpful in this context. For validation
     # and normalization purposes, we need all inputs to be strings.
     logger.info(f"Loading legacy contact data at {validate_legacy_case_data}")
@@ -138,6 +146,16 @@ def main_with_args(
     normalized_case_data_df = normalize_legacy_case_data(
         valid_df, data_dict, ignore_columns=["contact_id"]
     )
+
+    if "name" not in normalized_case_data_df.columns:
+        logger.info(
+            "Generating `name` property from `first_name`, `last_name`, and "
+            "`contact_id`"
+        )
+        normalized_case_data_df["name"] = normalized_case_data_df.apply(
+            lambda row: f"{row['first_name']} {row['last_name']} ({row['contact_id']})",
+            axis=1,
+        )
     if prompt_user:
         while True:
             keep_going = input(
