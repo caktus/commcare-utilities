@@ -16,7 +16,7 @@ def test_make_commcare_export_xl_wb():
     }
 
     wb = make_commcare_export_sync_xl_wb(mappings)
-    assert set(wb.get_sheet_names()) == set(mappings.keys())
+    assert set(wb.sheetnames) == set(mappings.keys())
     for sheet in wb:
         assert sheet["A1"].value == "Data Source"
         assert sheet["A2"].value == "case"

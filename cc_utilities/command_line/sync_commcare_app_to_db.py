@@ -25,6 +25,8 @@ def do_commcare_export_to_db(
     wb_file_path,
     commcare_user_name,
     commcare_api_key,
+    commcare_export_script_options,
+    commcare_export_script_flags,
 ):
     """Run `commcare-export` as subprocess to export data to SQL db
 
@@ -34,13 +36,30 @@ def do_commcare_export_to_db(
         wb_file_path (str): Where the workbook with source-column mappings lives
         commcare_user_name (str): The Commcare username (email address)
         commcare_api_key (str): A Commcare API key for the user
+        commcare_export_script_options (dict): A dict of additional args to get passed
+            to the `commcare-export` subprocess as command line options.
+        commcare_export_script_flags (list): A list of command line flags (with no args)
+            to pass to `commcare-export` subprocess.
     """
+    commcare_export_script_options = (
+        commcare_export_script_options if commcare_export_script_options else {}
+    )
+    commcare_export_script_flags = (
+        commcare_export_script_flags if commcare_export_script_flags else []
+    )
     commands = (
         f"commcare-export --output-format sql "
         f"--output {database_url_string} --project {commcare_project_name} "
         f"--query {wb_file_path} --username {commcare_user_name} "
-        f"--auth-mode apikey --password {commcare_api_key} --batch-size 5000"
-    ).split(" ")
+        f"--auth-mode apikey --password {commcare_api_key}"
+    )
+
+    additional_options = " ".join(
+        [f"--{k} {v}" for (k, v) in commcare_export_script_options.items()]
+    )
+    additional_flags = " ".join([f"--{flag}" for flag in commcare_export_script_flags])
+    commands = " ".join([commands, additional_options, additional_flags])
+    commands = commands.split(" ")
     subprocess.run(commands)
 
 
@@ -141,6 +160,8 @@ def main_with_args(
     existing_mapping_path,
     mapping_storage_path,
     app_structure_api_timeout,
+    commcare_export_script_options=None,
+    commcare_export_script_flags=None,
 ):
     """The main routine.
 
@@ -153,14 +174,18 @@ def main_with_args(
         db_url (str): Connection string for the db
         case_types (list): Optional. List of case types. If provided, only the provided
             case types will be synced.
-        existing_mapping_path (str): Optional. Path to an existing Excel wb containing
+        existing_mapping_path (str): Path to an existing Excel wb containing
             source-target mappings. If provided, this asset will be used, and the
             Application Structure API will not be called to get this data.
-        mapping_storage_path (str):  Optional. If provided, the Excel workbook
+        mapping_storage_path (str): If provided, the Excel workbook
             containing source-target mappings will be saved in this folder.
-        app_structure_api_timeout (int): Optional. If provided will override default
+        app_structure_api_timeout (int):If provided will override default
             timeout for the call to Application Structure API (
             which tends to take a while)
+        commcare_export_script_options (dict): A dict of additional args to get passed
+            to the `commcare-export` subprocess as command line options.
+        commcare_export_script_flags (list): A list of command line flags (with no args)
+            to pass to `commcare-export` subprocess.
     """
     cases_with_properties = (
         load_non_default_sources_from_workbook(existing_mapping_path)
@@ -176,14 +201,12 @@ def main_with_args(
     unfound = list(
         set(case_types).difference(set([k for k in cases_with_properties.keys()]))
     )
-
     if case_types and len(unfound) == len(case_types):
         logger.warn("None of the case types you requested were found")
         return
     if unfound:
         logger.warn(f"Some case types were not found: {', '.join(unfound)}")
         logger.info("Will continuing process the other requested case types")
-
     if case_types:
         cases_with_properties = {
             k: v for (k, v) in cases_with_properties.items() if k in case_types
@@ -220,6 +243,8 @@ def main_with_args(
             tmp_file_path,
             commcare_user_name,
             commcare_api_key,
+            commcare_export_script_options,
+            commcare_export_script_flags,
         )
     logger.info("I am quite done now.")
 
@@ -231,7 +256,7 @@ def main():
         help="The Commcare username (email address)",
         dest="commcare_user_name",
     )
-    parser.add_argument("--apikey", help="A Commcare API key", dest="commcare_api_key")
+    parser.add_argument("--api_key", help="A Commcare API key", dest="commcare_api_key")
     parser.add_argument(
         "--project", help="The Commcare project name", dest="commcare_project_name"
     )
@@ -239,12 +264,11 @@ def main():
         "--app-id", help="The ID of the CommCare app", dest="application_id"
     )
     parser.add_argument(
-        "--db-url", help="The URL string of the db to sync to", dest="db_url"
+        "--db-url", help="The URL string of the db to sync to",
     )
     parser.add_argument(
         "--case-types",
         help="Optional. Comma-separated list of case types to sync",
-        dest="case_types",
         nargs="*",
     )
     parser.add_argument(
@@ -254,34 +278,21 @@ def main():
             "If included, the script will not make a call to the Application Structure "
             "API and will instead use the mappings contained in this file"
         ),
-        dest="existing_mapping_path",
     )
     parser.add_argument(
         "--mapping-storage-path",
         help="Optional. Path to folder to store source-target mapping workbook to",
-        dest="mapping_storage_path",
     )
     parser.add_argument(
         "--app-structure-api-timeout",
         help="Optional. Seconds for timeout for request to application structure API",
-        dest="app_structure_api_timeout",
         type=int,
     )
     parser.add_argument(
-        "--since",
-        help="Optional. Export all data after this date. Format YYYY-MM-DD",
-        dest="since",
+        "--since", help="Optional. Export all data after this date. Format YYYY-MM-DD",
     )
     parser.add_argument(
-        "--until",
-        help="Optional. Export all up until this date. Format YYYY-MM-DD",
-        dest="until",
-    )
-    parser.add_argument(
-        "--verbose",
-        help="If flag included, logs of the db sync will be verbose.",
-        dest="verbose",
-        action="store_true",
+        "--until", help="Optional. Export all up until this date. Format YYYY-MM-DD",
     )
     parser.add_argument(
         "--batch-size",
@@ -289,11 +300,46 @@ def main():
             "Optional. Integer. If included, records will be streamed to the SQL "
             "db in batches of this size"
         ),
-        dest="batch_size",
         default=5000,
     )
+    parser.add_argument(
+        "--verbose",
+        help="If flag included, logs of the db sync will be verbose.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--users",
+        help="If flag included, export table with data about project's mobile workers",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--locations",
+        help="If flag included, export table with data about project's locations",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--with-organization",
+        help=(
+            "If flag included, export tables containing mobile worker data and "
+            "location data and add a commcare_userid field to any exported form or "
+            "case"
+        ),
+        action="store_true",
+    )
     args = parser.parse_args()
+
     try:
+        commcare_export_script_options = {
+            "since": args.since,
+            "until": args.until,
+        }
+        commcare_export_script_options = {
+            k: v for (k, v) in commcare_export_script_options.items() if v
+        }
+        flags = []
+        for arg in ["verbose", "users", "locations", "with_organization"]:
+            if args.__dict__[arg]:
+                flags.append(arg.replace("_", "-"))
         main_with_args(
             args.commcare_user_name,
             args.commcare_api_key,
@@ -304,12 +350,8 @@ def main():
             args.existing_mapping_path,
             args.mapping_storage_path,
             args.app_structure_api_timeout,
-            commcare_export_script_args=dict(
-                since=args.since,
-                until=args.until,
-                verbose=args.verbose,
-                batch_size=args.batch_size,
-            ),
+            commcare_export_script_options=commcare_export_script_options,
+            commcare_export_script_flags=flags,
         )
     except Exception as exc:
         logger.error(exc)
