@@ -13,7 +13,10 @@ from cc_utilities.common import (
     make_commcare_export_sync_xl_wb,
     make_sql_friendly,
 )
-from cc_utilities.constants import COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS
+from cc_utilities.constants import (
+    APPLICATION_STRUCTURE_DEFAULT_TIMEOUT,
+    COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS,
+)
 from cc_utilities.logger import logger
 
 PARENT_PROPERTY_PREFIX = "parent/"
@@ -287,6 +290,7 @@ def main():
         "--app-structure-api-timeout",
         help="Optional. Seconds for timeout for request to application structure API",
         type=int,
+        default=APPLICATION_STRUCTURE_DEFAULT_TIMEOUT,
     )
     parser.add_argument(
         "--since", help="Optional. Export all data after this date. Format YYYY-MM-DD",
