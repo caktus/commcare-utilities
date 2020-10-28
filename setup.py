@@ -13,7 +13,7 @@ setup(
         "commcare-export",
         "retry",
         "dateparser",
-        "openpyxl",
+        "openpyxl==2.5.12",  # commcare-export is pinned to this version
         "requests",
         "SQLAlchemy",
         "phonenumbers",
