@@ -255,6 +255,30 @@ def main_with_args(
     logger.info("I am quite done now.")
 
 
+def extract_options_and_flags_to_pass_to_commcare_export(args):
+    """Extract optional arguments and flags from args supplied at run time...
+
+    These are meant to be passed to the subprocess call to `commcare-export` that
+    causes the db sync to ultimately happen. That script optional args that will be
+    useful in some cases.
+    """
+    commcare_export_script_options = {
+        "since": args.since,
+        "until": args.until,
+    }
+    # get rid items that are not set and are therefore `None`
+    commcare_export_script_options = {
+        k: v for (k, v) in commcare_export_script_options.items() if v
+    }
+    commcare_export_script_flags = []
+    # these ones are optional flags that don't have a value.
+    # we check to see if they are included when script is called
+    for arg in ["verbose", "users", "locations", "with_organization"]:
+        if args.__dict__[arg]:
+            commcare_export_script_flags.append(arg.replace("_", "-"))
+    return commcare_export_script_options, commcare_export_script_flags
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -335,19 +359,12 @@ def main():
         action="store_true",
     )
     args = parser.parse_args()
-
+    (
+        additional_cc_export_options,
+        additional_cc_export_flags,
+    ) = extract_options_and_flags_to_pass_to_commcare_export(args)
     try:
-        commcare_export_script_options = {
-            "since": args.since,
-            "until": args.until,
-        }
-        commcare_export_script_options = {
-            k: v for (k, v) in commcare_export_script_options.items() if v
-        }
-        flags = []
-        for arg in ["verbose", "users", "locations", "with_organization"]:
-            if args.__dict__[arg]:
-                flags.append(arg.replace("_", "-"))
+
         main_with_args(
             args.commcare_user_name,
             args.commcare_api_key,
@@ -358,8 +375,8 @@ def main():
             args.existing_mapping_path,
             args.mapping_storage_path,
             args.app_structure_api_timeout,
-            commcare_export_script_options=commcare_export_script_options,
-            commcare_export_script_flags=flags,
+            commcare_export_script_options=additional_cc_export_options,
+            commcare_export_script_flags=additional_cc_export_flags,
         )
     except Exception as exc:
         logger.error(exc)
