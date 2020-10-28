@@ -61,7 +61,7 @@ def do_commcare_export_to_db(
         [f"--{k} {v}" for (k, v) in commcare_export_script_options.items()]
     )
     additional_flags = " ".join([f"--{flag}" for flag in commcare_export_script_flags])
-    commands = " ".join([commands, additional_options, additional_flags])
+    commands = " ".join([commands, additional_options, additional_flags]).strip()
     commands = commands.split(" ")
     subprocess.run(commands)
 
@@ -129,7 +129,7 @@ def get_mappings_from_app_structure(
     return cases_with_properties
 
 
-def load_non_default_sources_from_workbook(mapping_path):
+def load_app_mappings_from_workbook(mapping_path):
     """Mimic the values returned by `get_mappings_from_app_structure` by loading
         mapping data stored in a sourc-target mapping workbook.
 
@@ -191,8 +191,9 @@ def main_with_args(
             to pass to `commcare-export` subprocess.
     """
     cases_with_properties = (
-        load_non_default_sources_from_workbook(existing_mapping_path)
+        load_app_mappings_from_workbook(existing_mapping_path)
         if existing_mapping_path
+        # NB: This API call can take a long time: ~2-3 minutes
         else get_mappings_from_app_structure(
             commcare_project_name,
             commcare_user_name,
@@ -201,14 +202,16 @@ def main_with_args(
             app_structure_api_timeout,
         )
     )
-    unfound = list(
+    unfound_requested_case_types = list(
         set(case_types).difference(set([k for k in cases_with_properties.keys()]))
     )
-    if case_types and len(unfound) == len(case_types):
+    if case_types and len(unfound_requested_case_types) == len(case_types):
         logger.warn("None of the case types you requested were found")
         return
-    if unfound:
-        logger.warn(f"Some case types were not found: {', '.join(unfound)}")
+    if unfound_requested_case_types:
+        logger.warn(
+            f"Some case types were not found: {', '.join(unfound_requested_case_types)}"
+        )
         logger.info("Will continuing process the other requested case types")
     if case_types:
         cases_with_properties = {
@@ -273,6 +276,7 @@ def main():
         "--case-types",
         help="Optional. Comma-separated list of case types to sync",
         nargs="*",
+        default=[],
     )
     parser.add_argument(
         "--existing-mapping-path",

@@ -2,12 +2,12 @@ from setuptools import setup
 
 setup(
     name="commcare_utilities",
-    version="0.1",
+    version="1.0.0",
     description="Helpful utilities for working with CommCare",
     url="https://github.com/caktus/commcare-utilities",
     author="Benjamin White",
-    author_email="ben@benjamineugenewhite.com",
-    # license="MIT",   if/when we open source this, need to set right license type
+    author_email="pypy@benjamineugenewhite.com",
+    license="MIT",
     packages=["cc_utilities", "cc_utilities.command_line"],
     install_requires=[
         "commcare-export",
