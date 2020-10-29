@@ -55,8 +55,8 @@ Available command line arguments and flags:
 - `--app-structure-json-save-folder-path`: Optional. Path to a folder in which to save (normalized) JSON data returned by a call to the Application Structure API.
 - `--existing-app-structure-json`: Optional. Path to JSON file containing normalized application structure data. If included, the script will not make a call to the Application Structure API and will instead use the data contained in this file.
 - `--app-structure-api-timeout` - Optional. Seconds for timeout for request to application structure API. Defaults to value stored in `constants.APPLICATION_STRUCTURE_DEFAULT_TIMEOUT`
-- `--since` - Optional. Export all data after this date. Format YYYY-MM-DD
-- `--until` - Optional. Export all data up until this date. Format YYYY-MM-DD
+- `--since` - Optional. Export all data after (but not including) this date . Format YYYY-MM-DD
+- `--until` - Optional. Export all data up until (but not including) this date. Format YYYY-MM-DD
 - `--batch-size` - Optional. Integer. If included, records will be streamed to the SQL db in batches of this size
 - `--verbose` - If flag included, logs of the db sync will be verbose
 - `--users` - If flag included, export table with data about project's mobile workers
