@@ -12,6 +12,7 @@ This repo is for an assortment of scripts for developers working with Commcare.
   - [Setup](#setup)
   - [Tests](#tests)
   - [Scripts](#scripts)
+    - [`sync-commcare-app-to-db`](#sync-commcare-app-to-db)
     - [`generate-case-export-query-file`](#generate-case-export-query-file)
     - [`process-numbers-for-sms-capability`](#process-numbers-for-sms-capability)
     - [`bulk-upload-legacy-contact-data`](#bulk-upload-legacy-contact-data)
@@ -37,20 +38,94 @@ tox
 
 ## Scripts
 
+### `sync-commcare-app-to-db`
+
+This script allows a user to automatically backup one or more case types from a CommCareHQ project into a SQL database. It does so by calling the Application Structure API to retrieve data about all cases and their properties (past and present). Based on this data, it generates an Excel file mapping observed property names to target SQL db column names before calling `commcare-export` (a separate Python package maintained by Dimagi) as a subprocess with this Excel file as a parameter. During this final step, there will be logs indicating any new table-column combinations that were added to the database.
+
+While additional options are available, it's worth calling out two important, related command line arguments here: `--app-structure-json-save-folder-path` and `--existing-app-structure-json`. By providing an appropriate value for the `--app-structure-json-save-folder-path` option, the script will save a JSON blob of (cleaned up) data returned by the application structure API. Calls to this API endpoint are time consuming, so in subsequent runs of the script, this file can be referenced via the `--existing-app-structure-json` option. In this case, the script will not make a call to the Application Structure API and will instead rely on the saved JSON data. Keep in mind that that the database will not learn about any new properties that have been added to a case type if it doesn't call the API.
+
+Available command line arguments and flags:
+
+- `--username`: Mandatory. The Commcare username (email address)
+- `--api-key`: Mandatory. An API key associated with username
+- `--project`: Mandatory. The Commcare projecct name
+- `--app-id`: Mandatory. The ID of the Commcare app
+- `--db-url`: Mandatory. The URL string of the db to sync to
+- `--case-types`: Optional. Space-separated list of case types to sync. If not included, all available case types will be synced.
+- `--app-structure-json-save-folder-path`: Optional. Path to a folder in which to save (normalized) JSON data returned by a call to the Application Structure API.
+- `--existing-app-structure-json`: Optional. Path to JSON file containing normalized application structure data. If included, the script will not make a call to the Application Structure API and will instead use the data contained in this file.
+- `--app-structure-api-timeout` - Optional. Seconds for timeout for request to application structure API. Defaults to value stored in `constants.APPLICATION_STRUCTURE_DEFAULT_TIMEOUT`
+- `--since` - Optional. Export all data after (but not including) this date . Format YYYY-MM-DD
+- `--until` - Optional. Export all data up until (but not including) this date. Format YYYY-MM-DD
+- `--batch-size` - Optional. Integer. If included, records will be streamed to the SQL db in batches of this size
+- `--verbose` - If flag included, logs of the db sync will be verbose
+- `--users` - If flag included, export table with data about project's mobile workers
+- `--locations` - If flag included, export table with data about project's locations
+- `--with-organization` - If flag included, export tables containing mobile worker data and location data and add a commcare_userid field to any exported form or case
+
+Also noteworthy: When `commcare-export` encounters properties that do not have >=1 non-empty value in the source data, it will not add a column for that property type to the database. If on subsequent runs at least one case has been added with a non-null for the property, the property will be added as a column.
+
+**Before running the script**:
+
+In order to run this script, you will need to grab the ID for the app your trying to sync. To do this, log into the CommCareHQ dashboard, select your application from the `Applications` dropdown. Your app ID will be in the URL of the resulting page you're taken to:
+
+```text
+https://www.commcarehq.org/a/<project-name>/apps/view/<this-is-your-app-id>/
+```
+
+Additionally, you'll need to install the correct driver for your SQL database (i.e., `pyodbc` for MSSQL or `pyscogp2` for Postgres), as this script relies on SQLAlchemy behind the scenes, which in turn requires that the correct database driver be supplied.
+
+**Running the script:**
+
+Running the script as follows would sync all discovered case types and save a JSON representing the application structure in the folder specified by `--app-structure-json-save-folder-path`:
+
+```linux
+sync-commcare-app-to-db \
+  --username $COMMCARE_USER \
+  --apikey $COMMCARE_API_KEY \
+  --project $COMMCARE_PROJECT_NAME \
+  --app-id $APPLICATION_ID \
+  --db-url $DB_URL \
+  --app-structure-json-save-folder-path $SAVE_FOLDER_PATH
+```
+
+To specify only a subset of case types — for instance, contact and patient — you could run:
+
+```linux
+sync-commcare-app-to-db \
+  --username $COMMCARE_USER \
+  --apikey $COMMCARE_API_KEY \
+  --project $COMMCARE_PROJECT_NAME \
+  --app-id $APPLICATION_ID \
+  --db-url $DB_URL \
+  --app-structure-json-save-folder-path $SAVE_FOLDER_PATH
+  --case-types contact patient
+```
+
+To use a pre-existing JSON file and avoid making a request to the Application Structure API, you could run:
+
+```linux
+sync-commcare-app-to-db \
+  --username $COMMCARE_USER \
+  --api_key $COMMCARE_API_KEY \
+  --project $COMMCARE_PROJECT_NAME \
+  --app-id $APPLICATION_ID \
+  --db-url $DB_URL \
+  --existing-app-structure-json $JSON_FILE_PATH \
+```
+
 ### `generate-case-export-query-file`
 
 This script allows a user to generate an Excel query file to facilitate exporting data from CommCare to a SQL database or other local data store. It does by iterating over all records returned in the supplied [Case Summary](https://confluence.dimagi.com/display/commcarepublic/App+Summary#AppSummary-CaseSummary) Excel file to build a list of all observed property names to be turned into column names in a SQL db.
 
 An Excel workbook is created [as required by `commcare-export`](https://confluence.dimagi.com/display/commcarepublic/CommCare+Data+Export+Tool#CommCareDataExportTool-HowtoGenerateanExcelQueryFile), containing source to target column mappings. A separate tab is created for each case type. This same information is stored in a JSON, to make results auditable without requiring Excel. The JSON files are for informational purposes only; they can, for example, be checked into version control in a separate repository to help identify and provide a log of changes to the columns in the database over time. The JSON files are not used as an input to the process, so it is possible for fields to be removed if they are deprecated in the CommCare app.
 
-Note the following oddity: When `commcare-export` encounters properties that do not have >=1 non-empty value in the source data, it will not add a column for that property type to the database. If on subsequent runs at least one case has been added with a non-null for the property, the property will be added as a column. This behavior was observed in a Postgres db; other flavors of SQL were not tested. This means that the source-to-target mappings that are indicated in the JSON and Excel files are not a record of what was actually synced to the db, only what was attempted.
-
 **Running the script:**
 
 1. Navigate to the [Case Summary](https://confluence.dimagi.com/display/commcarepublic/App+Summary#AppSummary-CaseSummary) page (under App Summary) in the CommCare web interface, and download the corresponding Excel file. It should have an "All Case Properties" tab (this is the only tab that is needed).
 2. Run the script, specifying the input file, desired case type(s), and output locations. For instance, to export "patient" and "contact" case records:
 
-   ```
+  ```linux
    CASE_SUMMARY_FILE="MyApp - All Case Properties.xlsx"
    STATE_DIR="repo/export_query_files/commcare-project-name/"
    OUTPUT_FILE="${STATE_DIR}query_file.xlsx"
@@ -59,6 +134,8 @@ Note the following oddity: When `commcare-export` encounters properties that do 
    ```
 
 3. Run the `commcare-export` tool as provided in [its documentation](https://confluence.dimagi.com/display/commcarepublic/CommCare+Data+Export+Tool). Any new columns added to the DB will be noted in the command-line output of the script.
+
+Note the following oddity: When `commcare-export` encounters properties that do not have >=1 non-empty value in the source data, it will not add a column for that property type to the database. If on subsequent runs at least one case has been added with a non-null for the property, the property will be added as a column. This behavior was observed in a Postgres db; other flavors of SQL were not tested. This means that the source-to-target mappings that are indicated in the JSON and Excel files are not a record of what was actually synced to the db, only what was attempted.
 
 ### `process-numbers-for-sms-capability`
 

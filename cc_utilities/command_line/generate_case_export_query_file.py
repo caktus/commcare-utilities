@@ -5,12 +5,12 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-from openpyxl import Workbook, load_workbook
+from openpyxl import load_workbook
 
+from cc_utilities.common import make_commcare_export_sync_xl_wb, make_sql_friendly
 from cc_utilities.logger import logger
 
 VALID_PROPERTY_NAME = re.compile(r"[\w-]+")
-INVALID_SQL_CHARS = re.compile(r"[^\w]")
 
 # For some reason, the same values have different labels in different places in
 # CommCare. This list is taken from running a Case Data API query for a single
@@ -47,15 +47,6 @@ SPECIAL_CASE_PROPERTIES = [
     "case_type",
     "date_opened",
 ]
-
-
-def make_sql_friendly(value):
-    """Some CommCare properties and case types include dashes, which make for
-    bothersome SQL queries. Remove any non-alphanumeric or underscore
-    characters, then return resulting value."""
-    # Do not substitute "-" with "_" because in at least once instance, that would
-    # result in a duplicate property name ("date_opened").
-    return INVALID_SQL_CHARS.sub("", value)
 
 
 def extract_property_names(case_summary_file, case_types):
@@ -105,51 +96,6 @@ def generate_source_target_mappings(source_columns):
         for source_col in property_names
         if source_col not in STATIC_CASE_FIELDS
     ]
-
-
-def make_commcare_export_sync_xl_wb(mapping):
-    """Create an Excel workbook in format required for commcare-export script
-
-    NB: This does not save the workbook, and will need to call wb.save() on object
-    returned by this function in order to persist.
-
-
-    Args:
-        mapping (dict): Dictionary of lists of tuples of form
-            {"case_type": [("source_name", "target_name)]}
-
-    Returns:
-        obj: An Openpyxl workbook
-    """
-    sheet_headers = [
-        "Data Source",
-        "Filter Name",
-        "Filter Value",
-        "",
-        "Field",
-        "Source Field",
-    ]
-    wb = Workbook()
-    for i, (case_type, source_target_mappings) in enumerate(mapping.items()):
-        # Some case types have dashes in them, which makes SQL queries more
-        # bothersome to write.
-        ws_title = make_sql_friendly(case_type)
-        if i == 0:
-            ws = wb.active
-            ws.title = ws_title
-        else:
-            ws = wb.create_sheet(ws_title)
-        ws.append(sheet_headers)
-        ws["A2"] = "case"
-        ws["B2"] = "type"
-        ws["C2"] = case_type
-
-        row_offset = 2
-        for idx, item in enumerate(source_target_mappings):
-            row_num = idx + row_offset
-            # NOTE: Columns F, E are not in the order they appear in Excel (E, F)
-            ws[f"F{row_num}"], ws[f"E{row_num}"] = item
-    return wb
 
 
 def get_previous_mapping(state_dir, case_type):
@@ -222,6 +168,7 @@ def main_with_args(case_summary_file, case_types, output_file_path, state_dir):
                 save_column_state(state_dir, case_type, new_mapping)
 
     logger.info(f"Generating a temporary Excel workbook to {output_file_path}")
+    new_mappings = {make_sql_friendly(k): v for (k, v) in new_mappings.items()}
     wb = make_commcare_export_sync_xl_wb(new_mappings)
     wb.save(output_file_path)
 
