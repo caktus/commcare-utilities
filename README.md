@@ -46,7 +46,7 @@ While additional options are available, it's worth calling out two important, re
 
 Available command line arguments and flags:
 
-- `--username`: Mandatory. The Commcare username (email address)****
+- `--username`: Mandatory. The Commcare username (email address)
 - `--api-key`: Mandatory. An API key associated with username
 - `--project`: Mandatory. The Commcare projecct name
 - `--app-id`: Mandatory. The ID of the Commcare app
