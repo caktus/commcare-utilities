@@ -1,12 +1,10 @@
 import argparse
+import json
 import subprocess
 import sys
 import tempfile
-import traceback
 from datetime import datetime
 from pathlib import PurePath
-
-from openpyxl import load_workbook
 
 from cc_utilities.common import (
     get_application_structure,
@@ -66,12 +64,81 @@ def do_commcare_export_to_db(
     subprocess.run(commands)
 
 
-def get_mappings_from_app_structure(
+def normalize_application_structure_response_data(response_json):
+    """The application structure API returns some data that is not helpful for the
+    overall use case for this script. This function cleans up the JSON so only relevant
+    data remains. Additionally, this function collects the total set of properties
+    found
+
+    Args:
+        response_json (dict): The Python representation of the JSON returned by the
+            Application Structure API.
+
+    Returns:
+        dict: The keys are case types, and the values are lists of property names
+            associated with the case type. For instance {
+                "patient": ["first_name", "last_name", "etc.],
+                "contact": ["first_name", "last_name", "phone_number", "etc".]
+            }
+    """
+    normalized = {}
+    for module in response_json["modules"]:
+        # oddly, there are module types that appear that don't have a case type
+        if not module["case_type"]:
+            continue
+        # the same case type will appear in multiple modules (each version of the app)
+        # so we build up the total set of case types...
+        if not normalized.get(module["case_type"]):
+            normalized[module["case_type"]] = set(
+                [
+                    prop
+                    for prop in module["case_properties"]
+                    if not prop.startswith(PARENT_PROPERTY_PREFIX)
+                ]
+            )
+        else:
+            normalized[module["case_type"]] = normalized[module["case_type"]].union(
+                set(
+                    [
+                        prop
+                        for prop in module["case_properties"]
+                        # the app structure api returns a long list of properties
+                        # of parents of the given case type. we ignore these
+                        if not prop.startswith(PARENT_PROPERTY_PREFIX)
+                    ]
+                )
+            )
+    # convert the sets to lists at the end
+    return {k: list(v) for (k, v) in normalized.items()}
+
+
+def save_app_structure_json(structure, save_folder):
+    """Save the app structure as a JSON file, twice over.
+
+    The file will be saved once with a date+time based name, and a second time with
+    "latest" in the file name. So, for instance, "app_structure_10_20_20_11-43.json"
+    and "app_structure_latest.json".
+
+    Args:
+        structure (dict): The dictionary to be saved as JSON
+        save_folder (str): The folder where the files will be saved.
+    """
+    date_file_name = f"app_structure_{datetime.now().strftime('%m_%d_%Y_%H-%M')}.json"
+    latest_file_name = "app_structure_latest.json"
+    for file_name in (date_file_name, latest_file_name):
+        full_path = PurePath(save_folder).joinpath(file_name)
+        logger.info(f"Saving normalized application structure data at {full_path}")
+        with open(full_path, "w") as fl:
+            json.dump(structure, fl)
+
+
+def get_app_case_types_with_properties_from_api(
     commcare_project_name,
     commcare_user_name,
     commcare_api_key,
     commcare_app_id,
     app_structure_api_timeout,
+    app_structure_json_save_folder_path=None,
 ):
     """Get data about each case type and its known properties (historical and current)
         from the Application Structure API.
@@ -84,10 +151,17 @@ def get_mappings_from_app_structure(
             imported
         commcare_app_id (str): The ID of the Commcare app.
         app_structure_api_timeout (int): Optional. If provided will override default
-            timeout for the call to Application Structure API (
-            which tends to take a while)
+            timeout for the call to Application Structure API (which tends to take a
+            while)
+        app_structure_json_save_folder_path (str): Optional. If provided, the JSON
+            returned by the call to the Application Structure API will be saved as a
+            JSON file in this folder.
     Returns:
-        dict: Whose keys are case types and whose values are lists of property names
+        dict: Whose keys are case types and whose values are lists of property names.
+            For instance {
+                "patient": ["first_name", "last_name", "etc.],
+                "contact": ["first_name", "last_name", "phone_number", "etc".]
+            }
     """
     logger.info(
         f"Retrieving application structure for {commcare_project_name} with ID: "
@@ -100,57 +174,68 @@ def get_mappings_from_app_structure(
         commcare_app_id,
         app_structure_api_timeout,
     )
-    cases_with_properties = {}
-
-    for module in app_structure["modules"]:
-        # oddly, there are module types that appear that don't have a case type
-        if not module["case_type"]:
-            continue
-        if not cases_with_properties.get(module["case_type"]):
-            cases_with_properties[module["case_type"]] = set(
-                [
-                    prop
-                    for prop in module["case_properties"]
-                    if not prop.startswith(PARENT_PROPERTY_PREFIX)
-                ]
-            )
-        else:
-            cases_with_properties[module["case_type"]] = cases_with_properties[
-                module["case_type"]
-            ].union(
-                set(
-                    [
-                        prop
-                        for prop in module["case_properties"]
-                        if not prop.startswith(PARENT_PROPERTY_PREFIX)
-                    ]
-                )
-            )
-    return cases_with_properties
+    normalized_structure = normalize_application_structure_response_data(app_structure)
+    if app_structure_json_save_folder_path:
+        save_app_structure_json(
+            normalized_structure, app_structure_json_save_folder_path
+        )
+    return normalized_structure
 
 
-def load_app_mappings_from_workbook(mapping_path):
-    """Mimic the values returned by `get_mappings_from_app_structure` by loading
-        mapping data stored in a sourc-target mapping workbook.
+def load_app_case_types_with_properties_from_json(file_path):
+    """Load JSON file with data stored from the application structure API endpoint
 
     Args:
-        mapping_path (str): Path to an Excel wb containing source target mappings,
-            likely originally created by in the workbook creation portion of
-            `main_with_args` below.
-    Returns:
-        dict: Whose keys are case types and whose values are lists of property names
+        file_path (str): the path to a JSON file containing the data
     """
-    wb = load_workbook(filename=mapping_path)
-    cases_with_source_fields = {}
-    for sheet in wb:
-        source_fields = list(
-            map(lambda cell: cell.value.replace("properties.", ""), sheet["F:F"])
-        )[1:]
-        source_fields = set(source_fields).difference(
-            set([item[0] for item in COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS])
+    logger.info(f"Loading application structure data from {file_path}")
+    with open(file_path) as fl:
+        return json.load(fl)
+
+
+def generate_source_field_to_target_column_mappings(case_types_with_properties):
+    """Generate source property to target column mappings for each case type in...
+
+    ...`case_types_with_properties`. Note that this function also adds a set of default
+    mappings that are shared by all case types but that are not included in the data
+    returned by the Application Structure API.
+
+    Args:
+
+        case_types_with_properties (dict): Keys are CommCare case types. Values are
+            lists of strings of properties for the case type.
+
+    Returns:
+        dict: A dictionary whose keys are CommCare case types and whose values are
+            lists of tuples, where the first item is the source property (formatted
+            in a manner required by the `commcare-export` script, which this script
+            calls as a subprocess in a parent scope). For instance:
+
+            {
+                "contact": [
+                    ("properties.first_name", "first_name"),
+                    ("date_close", "date_closed"),
+                ],
+                "patient": [
+                    ("etc", "etc...."),
+                ]
+            }
+
+    """
+    source_to_target_mappings = {}
+    for case_type in case_types_with_properties:
+        source_to_target_mappings[make_sql_friendly(case_type)] = list(
+            set(
+                [
+                    *COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS,
+                    *[
+                        (f"properties.{item}", make_sql_friendly(item))
+                        for item in sorted(case_types_with_properties[case_type])
+                    ],
+                ]
+            )
         )
-        cases_with_source_fields[sheet.title] = source_fields
-    return cases_with_source_fields
+    return source_to_target_mappings
 
 
 def main_with_args(
@@ -159,10 +244,10 @@ def main_with_args(
     commcare_project_name,
     commcare_app_id,
     db_url,
-    case_types,
-    existing_mapping_path,
-    mapping_storage_path,
-    app_structure_api_timeout,
+    case_types=None,
+    existing_app_structure_json=None,
+    app_structure_json_save_folder_path=None,
+    app_structure_api_timeout=None,
     commcare_export_script_options=None,
     commcare_export_script_flags=None,
 ):
@@ -177,33 +262,40 @@ def main_with_args(
         db_url (str): Connection string for the db
         case_types (list): Optional. List of case types. If provided, only the provided
             case types will be synced.
-        existing_mapping_path (str): Path to an existing Excel wb containing
-            source-target mappings. If provided, this asset will be used, and the
-            Application Structure API will not be called to get this data.
-        mapping_storage_path (str): If provided, the Excel workbook
-            containing source-target mappings will be saved in this folder.
-        app_structure_api_timeout (int):If provided will override default
+        existing_app_structure_json (str): Optional. Path to a JSON blob storing data
+            returned by the CommCare Application Structure API endpoint.
+        app_structure_json_save_folder_path (str): Optional. If provided, the JSON blob
+            saved by a call to the Application Structure API will be saved in a file
+            here.
+        app_structure_api_timeout (int): Optional. If provided will override default
             timeout for the call to Application Structure API (
             which tends to take a while)
-        commcare_export_script_options (dict): A dict of additional args to get passed
-            to the `commcare-export` subprocess as command line options.
-        commcare_export_script_flags (list): A list of command line flags (with no args)
-            to pass to `commcare-export` subprocess.
+        commcare_export_script_options (dict): Optional. A dict of additional args to
+            get passed to the `commcare-export` subprocess as command line options.
+        commcare_export_script_flags (list): Optional. A list of command line flags
+            (with no args) to pass to `commcare-export` subprocess.
     """
-    cases_with_properties = (
-        load_app_mappings_from_workbook(existing_mapping_path)
-        if existing_mapping_path
+    case_types = case_types if case_types else []
+
+    all_case_types_with_properties = (
+        load_app_case_types_with_properties_from_json(existing_app_structure_json)
+        if existing_app_structure_json
         # NB: This API call can take a long time: ~2-3 minutes
-        else get_mappings_from_app_structure(
+        else get_app_case_types_with_properties_from_api(
             commcare_project_name,
             commcare_user_name,
             commcare_api_key,
             commcare_app_id,
             app_structure_api_timeout,
+            app_structure_json_save_folder_path,
         )
     )
+    # if person running script used the `--case-types` property and some of the ones
+    # they asked for weren't avaiable, we'll use this to notify them in the logs
     unfound_requested_case_types = list(
-        set(case_types).difference(set([k for k in cases_with_properties.keys()]))
+        set(case_types).difference(
+            set([k for k in all_case_types_with_properties.keys()])
+        )
     )
     if case_types and len(unfound_requested_case_types) == len(case_types):
         logger.warn("None of the case types you requested were found")
@@ -212,33 +304,25 @@ def main_with_args(
         logger.warn(
             f"Some case types were not found: {', '.join(unfound_requested_case_types)}"
         )
-        logger.info("Will continuing process the other requested case types")
-    if case_types:
-        cases_with_properties = {
-            k: v for (k, v) in cases_with_properties.items() if k in case_types
-        }
+        logger.info("Will continue processing the other requested case types")
+    # we'll try to sync the requested case types minus the unfound ones
+    to_sync_case_types = list(
+        set(case_types).difference(set(unfound_requested_case_types))
+    )
+    # filter `all_case_types_with_properties` down to only ones that are in our
+    # list of `to_sync_case_types`
+    to_sync_case_types_with_properties = {
+        k: v
+        for (k, v) in all_case_types_with_properties.items()
+        if k in to_sync_case_types
+    }
 
-    mappings = {}
-    for case_type in cases_with_properties:
-        mappings[make_sql_friendly(case_type)] = list(
-            set(
-                [
-                    *COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS,
-                    *[
-                        (f"properties.{item}", make_sql_friendly(item))
-                        for item in sorted(cases_with_properties[case_type])
-                    ],
-                ]
-            )
-        )
-    logger.info("Generating db sync mapping workbook")
+    mappings = generate_source_field_to_target_column_mappings(
+        to_sync_case_types_with_properties
+    )
+    # this excel wb file is required by commcare-export which gets called in subprocess
+    # by do_commcare_export_to_db
     wb = make_commcare_export_sync_xl_wb(mappings)
-    if mapping_storage_path:
-        wb.save(
-            PurePath(mapping_storage_path).joinpath(
-                f"mappings-{datetime.now().strftime('%m_%d_%Y_%H-%M')}.xlsx"
-            )
-        )
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_file_path = PurePath(tmpdir).joinpath("mapping.xlsx")
         wb.save(tmp_file_path)
@@ -261,6 +345,13 @@ def extract_options_and_flags_to_pass_to_commcare_export(args):
     These are meant to be passed to the subprocess call to `commcare-export` that
     causes the db sync to ultimately happen. That script optional args that will be
     useful in some cases.
+
+    Args:
+        args (object): The object returned by argparser's `parser.parse_args()`
+
+    Returns:
+        A tuple whose first item is key/val pairs of options and whose second item
+        is a list of flags
     """
     commcare_export_script_options = {
         "since": args.since,
@@ -303,16 +394,18 @@ def main():
         default=[],
     )
     parser.add_argument(
-        "--existing-mapping-path",
+        "--existing-app-structure-json",
         help=(
-            "Optional. Path to xl wb containing existing source-target mapping. "
-            "If included, the script will not make a call to the Application Structure "
-            "API and will instead use the mappings contained in this file"
+            "Optional. Path to a JSON blob storing data returned by the CommCare "
+            "Application Structure API endpoint"
         ),
     )
     parser.add_argument(
-        "--mapping-storage-path",
-        help="Optional. Path to folder to store source-target mapping workbook to",
+        "--app-structure-json-save-folder-path",
+        help=(
+            "Optional. If provided, the JSON blob saved by a call to the Application "
+            "Structure API will be saved in a file here."
+        ),
     )
     parser.add_argument(
         "--app-structure-api-timeout",
@@ -359,11 +452,11 @@ def main():
         action="store_true",
     )
     args = parser.parse_args()
-    (
-        additional_cc_export_options,
-        additional_cc_export_flags,
-    ) = extract_options_and_flags_to_pass_to_commcare_export(args)
     try:
+        (
+            additional_cc_export_options,
+            additional_cc_export_flags,
+        ) = extract_options_and_flags_to_pass_to_commcare_export(args)
 
         main_with_args(
             args.commcare_user_name,
@@ -372,14 +465,13 @@ def main():
             args.application_id,
             args.db_url,
             args.case_types,
-            args.existing_mapping_path,
-            args.mapping_storage_path,
+            args.existing_app_structure_json,
+            args.app_structure_json_save_folder_path,
             args.app_structure_api_timeout,
             commcare_export_script_options=additional_cc_export_options,
             commcare_export_script_flags=additional_cc_export_flags,
         )
-    except Exception as exc:
-        logger.error(exc)
-        logger.error(traceback.print_exc())
+    except Exception:
+        logger.exception("[sync_commcare_app_to_db.main] Something went wrong")
         sys.exit(1)
     sys.exit(0)
