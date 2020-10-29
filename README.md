@@ -42,7 +42,7 @@ tox
 
 This script allows a user to automatically backup one or more case types from a CommCareHQ project into a SQL database. It does so by calling the Application Structure API to retrieve data about all cases and their properties (past and present). Based on this data, it generates an Excel file mapping observed property names to target SQL db column names before calling `commcare-export` (a separate Python package maintained by DiMagi) as a subprocess with this Excel file as parameter. During this final step, there will be logs indicating any new table-column combinations that were added to the database.
 
-While additional options are available, it's worth calling out two important, related command line arguments here: `--mapping-storage-path` and `--existing-mapping-path`. By providing an appropriate value for the `--mapping-storage-path` option, the script will save an Excel file containing the source-target mappings used in the `commcare-export` subprocess. This file allows a user to audit which column mappings were attempted to be synced. It also enables a user to re-use this resource in subsequent runs of the script by supplying a path to such a file with the `--existing-mapping-path` option. In this case, the script will not make a call to the Application Structure API and will instead rely on the earlier mappings captured in the Excel file. Because the Application Structure API endpoint takes a long time to return a response, this approach can be helpful, but keep in mind that the database will not learn about any new properties that have been added to a case type if it doesn't call the API.
+While additional options are available, it's worth calling out two important, related command line arguments here: `--app-structure-json-save-folder-path` and `--existing-app-structure-json`. By providing an appropriate value for the `--app-structure-json-save-folder-path` option, the script will save a JSON blob of (cleaned up) data returned by the application structure API. Calls to this API endpoint are time consuming, so in subsequent runs of the script, this file can be referenced via the `--existing-app-structure-json` option. In this case, the script will not make a call to the Application Structure API and will instead rely on the saved JSON data. Keep in mind that that the database will not learn about any new properties that have been added to a case type if it doesn't call the API.
 
 Available command line arguments and flags:
 
@@ -52,7 +52,8 @@ Available command line arguments and flags:
 - `--app-id`: Mandatory. The ID of the Commcare app
 - `--db-url`: Mandatory. The URL string of the db to sync to
 - `--case-types`: Optional. Comma-separated list of case types to sync. If not included, all available case types will be synced.
-- `--existing-mapping-path`: Optional. Path to xl wb containing existing source-target mapping. If included, the script will not make a call to the Application Structure API and will instead use the mappings contained in this file.
+- `--app-structure-json-save-folder-path`: Optional. Path to a folder in which to save (normalized) JSON data returned by a call to the Application Structure API.
+- `--existing-app-structure-json`: Optional. Path to JSON file containing normalized application structure data. If included, the script will not make a call to the Application Structure API and will instead use the data contained in this file.
 - `--app-structure-api-timeout` - Optional. Seconds for timeout for request to application structure API. Defaults to value stored in `constants.APPLICATION_STRUCTURE_DEFAULT_TIMEOUT`
 - `--since` - Optional. Export all data after this date. Format YYYY-MM-DD
 - `--until` - Optional. Export all data up until this date. Format YYYY-MM-DD
@@ -76,22 +77,41 @@ Additionally, you'll need to install the correct driver for your SQL database (i
 
 **Running the script:**
 
-Running the script as follows would sync all discovered case types and save an Excel file of mappings in the folder specified by `--mapping-storage-path`:
+Running the script as follows would sync all discovered case types and save a JSON representing the application structure in the folder specified by `--app-structure-json-save-folder-path`:
 
 ```linux
-sync-commcare-app-to-db --username $COMMCARE_USER --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT_NAME --app-id $APPLICATION_ID --db-url $DB_URL --mapping-storage-path $STORAGE_PATH
+sync-commcare-app-to-db \
+  --username $COMMCARE_USER \
+  --apikey $COMMCARE_API_KEY \
+  --project $COMMCARE_PROJECT_NAME \
+  --app-id $APPLICATION_ID \
+  --db-url $DB_URL \
+  --app-structure-json-save-folder-path $SAVE_FOLDER_PATH
 ```
 
 To specify only a subset of case types — for instance, contact and patient — you could run:
 
 ```linux
-sync-commcare-app-to-db --username $COMMCARE_USER --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT_NAME --app-id $APPLICATION_ID --db-url $DB_URL --mapping-storage-path $STORAGE_PATH  --case-types contact patient
+sync-commcare-app-to-db \
+  --username $COMMCARE_USER \
+  --apikey $COMMCARE_API_KEY \
+  --project $COMMCARE_PROJECT_NAME \
+  --app-id $APPLICATION_ID \
+  --db-url $DB_URL \
+  --app-structure-json-save-folder-path $SAVE_FOLDER_PATH
+  --case-types contact patient
 ```
 
-To use a pre-existing Excel file and avoid making a request to the Application Structure API, you could run:
+To use a pre-existing JSON file and avoid making a request to the Application Structure API, you could run:
 
 ```linux
-sync-commcare-app-to-db --username $COMMCARE_USER --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT_NAME --app-id $APPLICATION_ID --db-url $DB_URL --mapping-storage-path $STORAGE_PATH --existing-mapping-path $PATH_TO_EXISTING_FILE
+sync-commcare-app-to-db \
+  --username $COMMCARE_USER \
+  --api_key $COMMCARE_API_KEY \
+  --project $COMMCARE_PROJECT_NAME \
+  --app-id $APPLICATION_ID \
+  --db-url $DB_URL \
+  --existing-app-structure-json $JSON_FILE_PATH \
 ```
 
 ### `generate-case-export-query-file`
