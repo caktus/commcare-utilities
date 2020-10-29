@@ -51,7 +51,7 @@ Available command line arguments and flags:
 - `--project`: Mandatory. The Commcare projecct name
 - `--app-id`: Mandatory. The ID of the Commcare app
 - `--db-url`: Mandatory. The URL string of the db to sync to
-- `--case-types`: Optional. Comma-separated list of case types to sync. If not included, all available case types will be synced.
+- `--case-types`: Optional. Space-separated list of case types to sync. If not included, all available case types will be synced.
 - `--app-structure-json-save-folder-path`: Optional. Path to a folder in which to save (normalized) JSON data returned by a call to the Application Structure API.
 - `--existing-app-structure-json`: Optional. Path to JSON file containing normalized application structure data. If included, the script will not make a call to the Application Structure API and will instead use the data contained in this file.
 - `--app-structure-api-timeout` - Optional. Seconds for timeout for request to application structure API. Defaults to value stored in `constants.APPLICATION_STRUCTURE_DEFAULT_TIMEOUT`
