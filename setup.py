@@ -20,7 +20,6 @@ setup(
         "pandas",
         "numpy",
         "xlrd",
-        "python-dotenv",
     ],
     entry_points={
         "console_scripts": [
