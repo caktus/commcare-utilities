@@ -6,6 +6,12 @@ import redcap
 import yaml
 
 from cc_utilities.logger import logger
+from cc_utilities.redcap_sync import clean_redcap_data
+
+EXCLUDE_COLUMNS = [
+    "redcap_repeat_instrument",
+    "redcap_repeat_instance",
+]
 
 
 def get_state(state_file):
@@ -50,7 +56,8 @@ def main_with_args(
     redcap_project = redcap.Project(redcap_api_url, redcap_api_key)
     next_date_begin = datetime.now()
 
-    redcap_project.export_records(format="df", date_begin=state["date_begin"])
+    df = redcap_project.export_records(format="df", date_begin=state["date_begin"])
+    clean_redcap_data(df)
 
     state["date_begin"] = next_date_begin
     save_state(state, state_file)
@@ -88,7 +95,7 @@ def main():
     )
     parser.add_argument(
         "--state-file",
-        help="The path where state should be read and daved",
+        help="The path where state should be read and saved",
         dest="state_file",
         required=True,
     )
