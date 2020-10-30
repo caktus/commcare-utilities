@@ -5,8 +5,8 @@ setup(
     version="1.0.0",
     description="Helpful utilities for working with CommCare",
     url="https://github.com/caktus/commcare-utilities",
-    author="Benjamin White",
-    author_email="pypy@benjamineugenewhite.com",
+    author="Caktus Consulting Group, LLC",
+    author_email="team@caktusgroup.com",
     license="MIT",
     packages=["cc_utilities", "cc_utilities.command_line"],
     install_requires=[
@@ -18,6 +18,8 @@ setup(
         "SQLAlchemy",
         "phonenumbers",
         "pandas",
+        # FIXME: Add "pycap==1.1.2" once this version is released; see: https://github.com/redcap-tools/PyCap/issues/126
+        # In the meantime, you can pip install https://github.com/redcap-tools/PyCap/archive/master.zip
         "numpy",
         "xlrd",
     ],
@@ -27,6 +29,7 @@ setup(
             "generate-case-export-query-file=cc_utilities.command_line.generate_case_export_query_file:main",
             "bulk-upload-legacy-contact-data=cc_utilities.command_line.bulk_upload_legacy_contact_data:main",
             "sync-commcare-app-to-db=cc_utilities.command_line.sync_commcare_app_to_db:main",
+            "sync-redcap-to-commcare=cc_utilities.command_line.sync_redcap_to_commcare:main",
         ]
     },
     zip_safe=False,
