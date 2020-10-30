@@ -2,6 +2,21 @@ import csv
 import os
 import subprocess
 
+from openpyxl import load_workbook
+
+CONTACT_SHEET_NAME = "contacts"
+
+# i.e., column "M", which has a formula for LPHA facing data validation
+# TODO: LINK TO THE ASSET ON s3 here
+DELETE_COLUMN_INDEX = 13
+
+
+def preprocess_linelist(path_to_wb):
+    wb = load_workbook(path_to_wb, guess_types=False)
+    ws = wb.get_sheet_by_name(CONTACT_SHEET_NAME)
+    ws.delete_cols(DELETE_COLUMN_INDEX)
+    wb.save(path_to_wb)
+
 
 def lookup_owner_id_for_project(project_slug, agency_owner_lookup_path):
     with open(agency_owner_lookup_path) as fl:
