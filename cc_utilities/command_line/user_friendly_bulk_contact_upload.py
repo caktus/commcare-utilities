@@ -2,16 +2,12 @@ import csv
 import os
 import subprocess
 
-from dotenv import load_dotenv
 
-load_dotenv()
-
-
-def lookup_agency_and_owner_ids(project_slug, agency_owner_lookup_path):
+def lookup_owner_id_for_project(project_slug, agency_owner_lookup_path):
     with open(agency_owner_lookup_path) as fl:
         reader = csv.DictReader(fl)
         row = next([row for row in reader if row["project_slug"] == project_slug])
-    return row["agency_id"], row["owner_id"]
+    return row["owner_id"]
 
 
 if __name__ == "__main__":
@@ -47,7 +43,7 @@ if __name__ == "__main__":
         if project_slug:
             break
 
-    agency_id, owner_id = lookup_agency_and_owner_ids(
+    owner_id = lookup_owner_id_for_project(
         project_slug, vars["PROJECT_AGENCY_OWNER_LOOKUP_PATH"]
     )
 
@@ -59,7 +55,7 @@ if __name__ == "__main__":
         f"--dataDictPath {vars['COMMCARE_CONTACT_DATA_DICT_CSV']} "
         f"--reportingPath {reporting_path} "
         f"--contactKeyValDict "
-        f"""'{{"AgencyID": {agency_id}, "owner_id": {owner_id}}}' """
+        f"""'{{"owner_id": {owner_id}}}' """
         f"--caseDataPath {file_path}"
     )
     commands = commands.split(" ")
