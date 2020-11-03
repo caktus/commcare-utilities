@@ -14,6 +14,7 @@ WB_CONTACT_SHEET_NAME = "contacts"
 
 
 def lookup_owner_id_for_project(project_slug, agency_owner_lookup_path):
+    "Based on project slug, look up the value for owner_id"
     with open(agency_owner_lookup_path) as fl:
         reader = csv.DictReader(fl)
         row = next(row for row in reader if row["project_slug"] == project_slug)
@@ -62,6 +63,7 @@ def main():
         logger.info(
             f"Altering original workbook, dropping columns: {', '.join(drop_columns)}"
         )
+        # open the Excel workbook and delete the columns then save it
         path = pathlib.Path(file_path).expanduser()
         wb = load_workbook(path)
         ws = wb[WB_CONTACT_SHEET_NAME]

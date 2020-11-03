@@ -53,7 +53,6 @@ def main_with_args(
     reporting_path,
     reject_all_if_any_invalid_rows=True,
     prompt_user=True,
-    drop_columns=None,
     rename_columns=None,
     **contact_kwargs,
 ):
@@ -87,9 +86,6 @@ def main_with_args(
         prompt_user (bool): If true, user will be prompted to affirm moving forward
             after data validation and normalization has succeeded. In testing, we need
             this behavior to be suppressed, so this param is to support that use case.
-        drop_columns (list): If provided, these columns will be dropped before
-            validation or normalizing data. Useful for when providing users with a
-            template that has additional columns used for pre-validation.
         rename_columns (dict): Optional. Keys are original column names, values are new
             names.
         contact_kwargs (dict): Optional key/value pairs that will be added to each
@@ -110,18 +106,17 @@ def main_with_args(
 
     logger.info(f"Loading legacy contact data at {legacy_case_data_path}")
 
+    # the main script wants a CSV file, but users may supply Excel wbs. If wb supplied
+    # we convert the `contacts` sheet into a CSV string IO
     case_data_file = (
         legacy_case_data_path
         if legacy_case_data_path.endswith(".csv")
         else convert_xl_wb_to_csv_string_io(legacy_case_data_path)
     )
+    # avoid unexpected data type conversions. we just treat everything as string.
     raw_case_data_df = pd.read_csv(case_data_file, keep_default_na=False).astype(
         "string"
     )
-    if drop_columns:
-        logger.info(f"Dropping columns: {' ,'.join(drop_columns)}")
-        raw_case_data_df.drop(columns=drop_columns, inplace=True)
-
     if rename_columns:
         col_map_string = ", ".join([f"{k} -> {v}" for (k, v) in rename_columns.items()])
         logger.info(f"Renaming columns: {col_map_string}")
