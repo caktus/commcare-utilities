@@ -28,6 +28,9 @@ FINAL_REPORT_FILE_NAME_PART = "final_report"
 def convert_xl_wb_to_csv_string_io(wb_path, sheet_name):
     """Used to accomodate Excel workbook inputs
     Converts an Excel workbook into a string IO representing the data as a CSV.
+
+    NB: We use this approach rather than using pd.read_excel because we need all values
+    to be treated as text and read_excel can lead to inferred data types we don't want
     """
     path = Path(wb_path).expanduser()
     wb = load_workbook(path)
