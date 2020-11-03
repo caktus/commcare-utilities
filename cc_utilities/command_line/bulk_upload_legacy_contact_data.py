@@ -115,9 +115,7 @@ def main_with_args(
     )
 
     # avoid unexpected data type conversions. we just treat everything as string.
-    raw_case_data_df = pd.read_csv(case_data_file, keep_default_na=False).astype(
-        "string"
-    )
+    raw_case_data_df = pd.read_csv(case_data_file, keep_default_na=False, dtype=str)
     if rename_columns:
         col_map_string = ", ".join([f"{k} -> {v}" for (k, v) in rename_columns.items()])
         logger.info(f"Renaming columns: {col_map_string}")
