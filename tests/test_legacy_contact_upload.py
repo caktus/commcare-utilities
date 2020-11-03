@@ -34,6 +34,11 @@ CONTACT_DATA_DICT = {
         "allowed_values": [],
         "data_type": "plain",
     },
+    "last_name": {
+        "required": True,
+        "allowed_values": [],
+        "data_type": "plain",
+    },
     "dob": {
         "required": False,
         "allowed_values": [],
@@ -76,6 +81,7 @@ def make_valid_contact():
     "Create contact with randomly generated values that validate vs. CONTACT_DATA_DICT"
     return {
         "first_name": fake.first_name(),
+        "last_name": fake.last_name(),
         "dob": fake.date_of_birth(minimum_age=18, maximum_age=100).strftime("%Y/%m/%d"),
         "phone_work": fake.phone_number(),
         "days_symptoms_lasted": random.randint(2, 14),

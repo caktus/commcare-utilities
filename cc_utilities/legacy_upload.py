@@ -511,8 +511,10 @@ def get_normalization_fn(col_name, data_dict):
         return normalize_date_field
     if col_type == "phone_number":
         return partial(normalize_phone_number, col_name=col_name)
-    if col_type in ("select", "multi_select", "phone_number"):
+    if col_type == "select":
         return lambda val: val.strip()
+    if col_type == "multi_select":
+        return lambda val: " ".join([item.strip() for item in val.split(",")])
 
 
 def normalize_legacy_case_data(validated_df, data_dict, ignore_columns=None):
@@ -531,7 +533,9 @@ def normalize_legacy_case_data(validated_df, data_dict, ignore_columns=None):
     validated_df = validated_df.copy(deep=True)
     ignore_columns = ignore_columns if ignore_columns else []
     for col in validated_df.columns.drop(ignore_columns):
-        validated_df[col].apply(get_normalization_fn(col, data_dict))
+        validated_df[col] = validated_df[col].apply(
+            get_normalization_fn(col, data_dict)
+        )
     return validated_df
 
 
