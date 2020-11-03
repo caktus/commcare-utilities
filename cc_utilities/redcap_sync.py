@@ -79,6 +79,6 @@ def split_cases_and_contacts(df):
         lambda row: f"REDCAP-{row['record_id']}-{row['redcap_repeat_instance']}", axis=1
     )
     contacts_df.drop(
-        ["redcap_repeat_instrument", "redcap_repeat_instance"], axis=1, inplace=True
+        columns=["redcap_repeat_instrument", "redcap_repeat_instance"], inplace=True
     )
     return cases_df, contacts_df
