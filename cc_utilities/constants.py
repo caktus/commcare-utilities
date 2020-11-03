@@ -9,6 +9,7 @@ COMMCARE_UPLOAD_STATES = dict(missing=-1, not_started=0, started=1, success=2, f
 COMMCARE_UNSET_CAN_SMS_LABEL = "pending"
 COMMCARE_CANNOT_SMS_LABEL = "no"
 COMMCARE_CAN_SMS_LABEL = "yes"
+EMPTY_PHONE_VALUES = ("", None)
 TWILIO_INVALID_NUMBER_FOR_REGION_CODE = 404
 TWILIO_LANDLINE_CODE = "landline"
 TWILIO_LOOKUP_URL = "https://lookups.twilio.com/v1/PhoneNumbers"
