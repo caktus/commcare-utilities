@@ -1,10 +1,13 @@
 import argparse
+import csv
+import io
 import json
 import sys
 from datetime import datetime
 from pathlib import Path, PurePath
 
 import pandas as pd
+from openpyxl import load_workbook
 
 from cc_utilities.legacy_upload import (
     LegacyUploadError,
@@ -22,6 +25,26 @@ VALIDATION_REPORT_FILE_NAME_PART = "validation_report"
 FINAL_REPORT_FILE_NAME_PART = "final_report"
 
 
+def convert_xl_wb_to_csv_string_io(wb_path, sheet_name):
+    """Used to accomodate Excel workbook inputs
+    Converts an Excel workbook into a string IO representing the data as a CSV.
+
+    NB: We use this approach rather than using pd.read_excel because we need all values
+    to be treated as text and read_excel can lead to inferred data types we don't want
+    """
+    path = Path(wb_path).expanduser()
+    wb = load_workbook(path)
+    ws = wb[sheet_name]
+    output = io.StringIO()
+    writer = csv.writer(output)
+    for row in ws.rows:
+        # only want non-empty rows
+        if any([cell.value for cell in row]):
+            writer.writerow([cell.value for cell in row])
+    output.seek(0)
+    return output
+
+
 def main_with_args(
     commcare_user_name,
     commcare_api_key,
@@ -31,6 +54,7 @@ def main_with_args(
     reporting_path,
     reject_all_if_any_invalid_rows=True,
     prompt_user=True,
+    rename_columns=None,
     **contact_kwargs,
 ):
     """The main routine. Create CommCare contacts based on legacy contact data.
@@ -52,7 +76,8 @@ def main_with_args(
         commcare_user_name (str): The Commcare username (email address)
         commcare_api_key (str): A Commcare API key for the user
         commcare_project_name (str): The Commcare project to which contacts will be imported
-        legacy_case_data_path (str): Path to a CSV containing contacts to be imported
+        legacy_case_data_path (str): Path to an Excel file or CSV containing contacts
+            to be imported
         data_dictionary_path (str): Path to a CSV of a data dict used to validate user-
             supplied contact data. Note that this asset is based on but distinct from
             the data dict provided in the CommCare dashboard. It should have the
@@ -63,17 +88,39 @@ def main_with_args(
         prompt_user (bool): If true, user will be prompted to affirm moving forward
             after data validation and normalization has succeeded. In testing, we need
             this behavior to be suppressed, so this param is to support that use case.
+        rename_columns (dict): Optional. Keys are original column names, values are new
+            names.
         contact_kwargs (dict): Optional key/value pairs that will be added to each
             generated contact.
     """
     logger.info(f"Loading data dictionary at {data_dictionary_path}")
     data_dict = load_data_dict(data_dictionary_path)
+    assert all(
+        [field in data_dict for field in ("first_name", "last_name")]
+    ), "Data dict must contain `first_name` and `last_name` for contact upload"
+    # these must be present in order to enable creation of `name` property, which
+    # needs to be generated if not supplied in upload data
+    data_dict["first_name"]["required"] = True
+    data_dict["last_name"]["required"] = True
+
     # Pandas infers data types, and that's not helpful in this context. For validation
     # and normalization purposes, we need all inputs to be strings.
-    logger.info(f"Loading legacy contact data at {validate_legacy_case_data}")
-    raw_case_data_df = pd.read_csv(legacy_case_data_path, keep_default_na=False).astype(
-        "string"
+    logger.info(f"Loading legacy contact data at {legacy_case_data_path}")
+
+    # we can load either a csv or excel file
+    case_data_file = (
+        legacy_case_data_path
+        if legacy_case_data_path.endswith(".csv")
+        else convert_xl_wb_to_csv_string_io(legacy_case_data_path)
     )
+
+    # avoid unexpected data type conversions. we just treat everything as string.
+    raw_case_data_df = pd.read_csv(case_data_file, keep_default_na=False, dtype=str)
+    if rename_columns:
+        col_map_string = ", ".join([f"{k} -> {v}" for (k, v) in rename_columns.items()])
+        logger.info(f"Renaming columns: {col_map_string}")
+        raw_case_data_df.rename(columns=rename_columns, inplace=True)
+
     logger.info("Validating columns in legacy contact data CSV against data dictionary")
     if (
         validate_case_data_columns(
@@ -138,6 +185,16 @@ def main_with_args(
     normalized_case_data_df = normalize_legacy_case_data(
         valid_df, data_dict, ignore_columns=["contact_id"]
     )
+
+    if "name" not in normalized_case_data_df.columns:
+        logger.info(
+            "Generating `name` property from `first_name`, `last_name`, and "
+            "`contact_id`"
+        )
+        normalized_case_data_df["name"] = normalized_case_data_df.apply(
+            lambda row: f"{row['first_name']} {row['last_name']} ({row['contact_id']})",
+            axis=1,
+        )
     if prompt_user:
         while True:
             keep_going = input(

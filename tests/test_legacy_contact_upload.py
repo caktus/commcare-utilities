@@ -34,6 +34,11 @@ CONTACT_DATA_DICT = {
         "allowed_values": [],
         "data_type": "plain",
     },
+    "last_name": {
+        "required": True,
+        "allowed_values": [],
+        "data_type": "plain",
+    },
     "dob": {
         "required": False,
         "allowed_values": [],
@@ -76,8 +81,9 @@ def make_valid_contact():
     "Create contact with randomly generated values that validate vs. CONTACT_DATA_DICT"
     return {
         "first_name": fake.first_name(),
+        "last_name": fake.last_name(),
         "dob": fake.date_of_birth(minimum_age=18, maximum_age=100).strftime("%Y/%m/%d"),
-        "phone_work": fake.phone_number(),
+        "phone_work": "919-919-9999",
         "days_symptoms_lasted": random.randint(2, 14),
         "current_smoker": random.choice(
             CONTACT_DATA_DICT["current_smoker"]["allowed_values"]
@@ -409,8 +415,8 @@ def test_command_line_script_happy_path(
             "user_name",
             "api_key",
             "my_project",
-            data_path,
-            data_dict_path,
+            data_path.as_posix(),
+            data_dict_path.as_posix(),
             report_dir,
             prompt_user=False,
             **ad_hoc_contact_key_vals,

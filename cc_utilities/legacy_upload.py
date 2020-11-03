@@ -1,10 +1,12 @@
 import csv
+from functools import partial
 from math import ceil, log2
 from urllib.parse import urljoin
 from uuid import uuid4
 
 import dateparser
 import numpy as np
+import phonenumbers
 from retry import retry
 
 from cc_utilities.common import (
@@ -13,7 +15,7 @@ from cc_utilities.common import (
     get_commcare_cases,
     upload_data_to_commcare,
 )
-from cc_utilities.constants import CASE_REPORT_URL
+from cc_utilities.constants import CASE_REPORT_URL, EMPTY_PHONE_VALUES
 from cc_utilities.logger import logger
 
 MAX_CONTACTS_PER_PARENT_PATIENT = 100
@@ -350,6 +352,33 @@ def validate_multi_select_field(raw_value, allowed_values):
     return any([len(values) == 0, set(values).issubset(set(allowed_values))])
 
 
+def validate_phone_number_field(raw_value, country_code="US"):
+    "Validate a value whose CommCare data type is `phone_number`"
+    # if this field is blank we just treat it as valid
+    if raw_value in EMPTY_PHONE_VALUES:
+        return True
+    number = phonenumbers.parse(raw_value, country_code)
+    return phonenumbers.is_valid_number(number)
+
+
+def normalize_phone_number(raw_value, col_name=None, country_code="US"):
+    """Normalize a phone number to standard 10 digits (assuming US number)
+
+    If the column name (`col_name`) is "contact_phone_number", the national number
+    will be prepended with the country code, as this is what CommCareHQ wants to see
+    for this field (vs. "phone_home" and "phone_work" which should be 10 digits alone)
+    """
+    # if this field is blank, we pass through empty string
+    if raw_value in EMPTY_PHONE_VALUES:
+        return ""
+    number = phonenumbers.parse(raw_value, country_code)
+    return (
+        f"{number.country_code}{number.national_number}"
+        if col_name == "contact_phone_number"
+        else number.national_number
+    )
+
+
 def get_validation_fn(col_name, data_dict):
     """Look up the validation function for a given column based on data dictionary
 
@@ -379,7 +408,7 @@ def get_validation_fn(col_name, data_dict):
     # and that is unlikely for our use case.  Alternatively, we could parse only for US
     # numbers, but contacts might have non-US phone numbers.
     if col_type == "phone_number":
-        return lambda x: True
+        return validate_phone_number_field
     if col_type == "number":
         return validate_number_field
     if col_type == "date":
@@ -482,8 +511,12 @@ def get_normalization_fn(col_name, data_dict):
         return normalize_number_field
     if col_type == "date":
         return normalize_date_field
-    if col_type in ("select", "multi_select", "phone_number"):
+    if col_type == "phone_number":
+        return partial(normalize_phone_number, col_name=col_name)
+    if col_type == "select":
         return lambda val: val.strip()
+    if col_type == "multi_select":
+        return lambda val: " ".join([item.strip() for item in val.split(",")])
 
 
 def normalize_legacy_case_data(validated_df, data_dict, ignore_columns=None):
@@ -502,7 +535,9 @@ def normalize_legacy_case_data(validated_df, data_dict, ignore_columns=None):
     validated_df = validated_df.copy(deep=True)
     ignore_columns = ignore_columns if ignore_columns else []
     for col in validated_df.columns.drop(ignore_columns):
-        validated_df[col].apply(get_normalization_fn(col, data_dict))
+        validated_df[col] = validated_df[col].apply(
+            get_normalization_fn(col, data_dict)
+        )
     return validated_df
 
 
