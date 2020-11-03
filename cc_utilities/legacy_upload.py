@@ -1,10 +1,12 @@
 import csv
+from functools import partial
 from math import ceil, log2
 from urllib.parse import urljoin
 from uuid import uuid4
 
 import dateparser
 import numpy as np
+import phonenumbers
 from retry import retry
 
 from cc_utilities.common import (
@@ -350,6 +352,31 @@ def validate_multi_select_field(raw_value, allowed_values):
     return any([len(values) == 0, set(values).issubset(set(allowed_values))])
 
 
+def validate_phone_number_field(raw_value, country_code="US"):
+    "Validate a value whose CommCare data type is `phone_number`"
+    if raw_value in ("", None):
+        return True
+    number = phonenumbers.parse(raw_value, country_code)
+    return phonenumbers.is_valid_number(number)
+
+
+def normalize_phone_number(raw_value, col_name=None, country_code="US"):
+    """Normalize a phone number to standard 10 digits (assuming US number)
+
+    If the column name (`col_name`) is "contact_phone_number", the national number
+    will be prepended with the country code, as this is what CommCareHQ wants to see
+    for this field (vs. "phone_home" and "phone_work" which should be 10 digits alone)
+    """
+    if raw_value in ("", None):
+        return ""
+    number = phonenumbers.parse(raw_value, country_code)
+    return (
+        f"{number.country_code}{number.national_number}"
+        if col_name == "contact_phone_number"
+        else number.national_number
+    )
+
+
 def get_validation_fn(col_name, data_dict):
     """Look up the validation function for a given column based on data dictionary
 
@@ -379,7 +406,7 @@ def get_validation_fn(col_name, data_dict):
     # and that is unlikely for our use case.  Alternatively, we could parse only for US
     # numbers, but contacts might have non-US phone numbers.
     if col_type == "phone_number":
-        return lambda x: True
+        return validate_phone_number_field
     if col_type == "number":
         return validate_number_field
     if col_type == "date":
@@ -482,6 +509,8 @@ def get_normalization_fn(col_name, data_dict):
         return normalize_number_field
     if col_type == "date":
         return normalize_date_field
+    if col_type == "phone_number":
+        return partial(normalize_phone_number, col_name=col_name)
     if col_type in ("select", "multi_select", "phone_number"):
         return lambda val: val.strip()
 

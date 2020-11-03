@@ -1,10 +1,13 @@
 import argparse
+import csv
+import io
 import json
 import sys
 from datetime import datetime
 from pathlib import Path, PurePath
 
 import pandas as pd
+from openpyxl import load_workbook
 
 from cc_utilities.legacy_upload import (
     LegacyUploadError,
@@ -20,6 +23,25 @@ from cc_utilities.logger import logger
 
 VALIDATION_REPORT_FILE_NAME_PART = "validation_report"
 FINAL_REPORT_FILE_NAME_PART = "final_report"
+WB_CONTACT_SHEET_NAME = "contacts"
+
+
+def convert_xl_wb_to_csv_string_io(wb_path, sheet_name=WB_CONTACT_SHEET_NAME):
+    """Used to accomodate Excel workbook inputs
+
+    Converts an Excel workbook into a string IO representing the data as a CSV.
+    """
+    path = Path(wb_path).expanduser()
+    wb = load_workbook(path)
+    ws = wb[sheet_name]
+    output = io.StringIO()
+    writer = csv.writer(output)
+    for row in ws.rows:
+        # only want non-empty rows
+        if any([cell.value for cell in row]):
+            writer.writerow([cell.value for cell in row])
+    output.seek(0)
+    return output
 
 
 def main_with_args(
@@ -31,6 +53,8 @@ def main_with_args(
     reporting_path,
     reject_all_if_any_invalid_rows=True,
     prompt_user=True,
+    drop_columns=None,
+    rename_columns=None,
     **contact_kwargs,
 ):
     """The main routine. Create CommCare contacts based on legacy contact data.
@@ -63,6 +87,11 @@ def main_with_args(
         prompt_user (bool): If true, user will be prompted to affirm moving forward
             after data validation and normalization has succeeded. In testing, we need
             this behavior to be suppressed, so this param is to support that use case.
+        drop_columns (list): If provided, these columns will be dropped before
+            validation or normalizing data. Useful for when providing users with a
+            template that has additional columns used for pre-validation.
+        rename_columns (dict): Optional. Keys are original column names, values are new
+            names.
         contact_kwargs (dict): Optional key/value pairs that will be added to each
             generated contact.
     """
@@ -70,10 +99,26 @@ def main_with_args(
     data_dict = load_data_dict(data_dictionary_path)
     # Pandas infers data types, and that's not helpful in this context. For validation
     # and normalization purposes, we need all inputs to be strings.
-    logger.info(f"Loading legacy contact data at {validate_legacy_case_data}")
-    raw_case_data_df = pd.read_csv(legacy_case_data_path, keep_default_na=False).astype(
+
+    logger.info(f"Loading legacy contact data at {legacy_case_data_path}")
+
+    case_data_file = (
+        legacy_case_data_path
+        if legacy_case_data_path.endswith(".csv")
+        else convert_xl_wb_to_csv_string_io(legacy_case_data_path)
+    )
+    raw_case_data_df = pd.read_csv(case_data_file, keep_default_na=False).astype(
         "string"
     )
+    if drop_columns:
+        logger.info(f"Dropping columns: {' ,'.join(drop_columns)}")
+        raw_case_data_df.drop(columns=drop_columns, inplace=True)
+
+    if rename_columns:
+        col_map_string = ", ".join([f"{k} -> {v}" for (k, v) in rename_columns.items()])
+        logger.info(f"Renaming columns: {col_map_string}")
+        raw_case_data_df.rename(columns=rename_columns, inplace=True)
+
     logger.info("Validating columns in legacy contact data CSV against data dictionary")
     if (
         validate_case_data_columns(
