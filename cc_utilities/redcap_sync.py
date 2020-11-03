@@ -1,9 +1,8 @@
-import logging
 from collections import defaultdict
 
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+from .logger import logger
 
 
 def collapse_checkbox_columns(df):
@@ -29,7 +28,8 @@ def collapse_checkbox_columns(df):
                     bool,
                     [
                         cc_value
-                        if pd.notnull(row[redcap_col]) and row[redcap_col]
+                        if pd.notnull(row[redcap_col])
+                        and row[redcap_col].strip() == "1"
                         else False
                         for redcap_col, cc_value in source_val_list
                     ],
@@ -38,9 +38,9 @@ def collapse_checkbox_columns(df):
             axis=1,
         )
         # Remove the obsolete columns
-        for redcap_col, _ in source_val_list:
-            logger.info(f"Dropping column {redcap_col} from df")
-            df.drop(columns=redcap_col, inplace=True)
+        redcap_cols = [col for col, _ in source_val_list]
+        logger.info(f"Dropping columns {redcap_cols} from df")
+        df.drop(columns=redcap_cols, inplace=True)
     return df
 
 
@@ -61,7 +61,7 @@ def split_cases_and_contacts(df):
             "Using REDCap record_id for external_id! Future uploads may duplicate cases."
         )
         cases_df["external_id"] = cases_df.apply(
-            lambda row: f"REDCAP-{row['record_id']}", axis=1
+            lambda row: f"REDCAP:record_id:{row['record_id']}", axis=1
         )
     # Rows with "close_contacts" in "redcap_repeat_instrument" column and columns that
     # contain only missing values removed.
@@ -76,7 +76,8 @@ def split_cases_and_contacts(df):
         axis=1,
     )
     contacts_df["external_id"] = contacts_df.apply(
-        lambda row: f"REDCAP-{row['record_id']}-{row['redcap_repeat_instance']}", axis=1
+        lambda row: f"{row['parent_external_id']}:redcap_repeat_instance:{row['redcap_repeat_instance']}",
+        axis=1,
     )
     contacts_df.drop(
         columns=["redcap_repeat_instrument", "redcap_repeat_instance"], inplace=True

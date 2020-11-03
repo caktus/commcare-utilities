@@ -61,7 +61,7 @@ def main_with_args(
             # Without index_col=False, read_csv() will use the first column
             # ("record_id") as the index, which is problematic because it's
             # not unique and is easier to handle as a separate column anyways.
-            df_kwargs={"index_col": False},
+            df_kwargs={"index_col": False, "dtype": str},
         )
         .pipe(collapse_checkbox_columns)
         .pipe(split_cases_and_contacts)
