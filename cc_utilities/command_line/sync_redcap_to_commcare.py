@@ -66,7 +66,7 @@ def main_with_args(
         .pipe(collapse_checkbox_columns)
         .pipe(split_cases_and_contacts)
     )
-    logger.info("Uploading found patients (case) to CommCare...")
+    logger.info("Uploading found patients (cases) to CommCare...")
     upload_data_to_commcare(
         cases_df,
         commcare_project_name,
