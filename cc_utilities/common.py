@@ -137,7 +137,7 @@ def get_commcare_cases(
 
 
 def upload_data_to_commcare(
-    data,
+    df,  # can be dict or pd.DataFrame
     project_slug,
     case_type,
     search_column,
@@ -156,11 +156,11 @@ def upload_data_to_commcare(
     }
     adapter = HTTPAdapter(max_retries=retry_strategy)
     url = BULK_UPLOAD_URL.format(project_slug)
-    fieldnames = data[0].keys()
+    if not isinstance(df, pd.DataFrame):
+        df = pd.DataFrame(df)
     assert (
-        search_column in fieldnames
+        search_column in df.columns
     ), f"Data items must have property '{search_column}'"
-    df = pd.DataFrame(data)
     files = {
         "file": (
             f"{file_name_prefix}{case_type}.csv",

@@ -5,13 +5,9 @@ from datetime import datetime
 import redcap
 import yaml
 
+from cc_utilities.common import upload_data_to_commcare
 from cc_utilities.logger import logger
-from cc_utilities.redcap_sync import clean_redcap_data
-
-EXCLUDE_COLUMNS = [
-    "redcap_repeat_instrument",
-    "redcap_repeat_instance",
-]
+from cc_utilities.redcap_sync import collapse_checkbox_columns, split_cases_and_contacts
 
 
 def get_state(state_file):
@@ -38,6 +34,7 @@ def main_with_args(
     redcap_api_key,
     state_file,
     data_dictionary_path,
+    sync_all,
 ):
     """TBD
 
@@ -56,9 +53,39 @@ def main_with_args(
     redcap_project = redcap.Project(redcap_api_url, redcap_api_key)
     next_date_begin = datetime.now()
 
-    df = redcap_project.export_records(format="df", date_begin=state["date_begin"])
-    clean_redcap_data(df)
-
+    logger.info("Retrieving and cleaning data from REDCap...")
+    cases_df, contacts_df = (
+        redcap_project.export_records(
+            format="df",
+            date_begin=state["date_begin"] if not sync_all else None,
+            # Without index_col=False, read_csv() will use the first column
+            # ("record_id") as the index, which is problematic because it's
+            # not unique and is easier to handle as a separate column anyways.
+            df_kwargs={"index_col": False},
+        )
+        .pipe(collapse_checkbox_columns)
+        .pipe(split_cases_and_contacts)
+    )
+    logger.info("Uploading found patients (case) to CommCare...")
+    upload_data_to_commcare(
+        cases_df,
+        commcare_project_name,
+        "patient",
+        "external_id",
+        commcare_user_name,
+        commcare_api_key,
+        search_field="external_id",
+    )
+    logger.info("Uploading found contacts to CommCare...")
+    upload_data_to_commcare(
+        contacts_df,
+        commcare_project_name,
+        "contact",
+        "external_id",
+        commcare_user_name,
+        commcare_api_key,
+        search_field="external_id",
+    )
     state["date_begin"] = next_date_begin
     save_state(state, state_file)
     logger.info("Sync done.")
@@ -104,6 +131,12 @@ def main():
         help="The path where the data dictionary CSV is located, for validation purposes (optional)",
         dest="data_dictionary_path",
     )
+    parser.add_argument(
+        "--sync-all",
+        help="The path where state should be read and saved",
+        dest="sync_all",
+        action="store_true",
+    )
     args = parser.parse_args()
     main_with_args(
         args.commcare_user_name,
@@ -113,4 +146,5 @@ def main():
         args.redcap_api_key,
         args.state_file,
         args.data_dictionary_path,
+        args.sync_all,
     )
