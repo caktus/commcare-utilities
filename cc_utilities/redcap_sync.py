@@ -44,25 +44,25 @@ def collapse_checkbox_columns(df):
     return df
 
 
-def split_cases_and_contacts(df):
+def split_cases_and_contacts(df, external_id_col):
     """
     Splits a single dataframe of cases and contacts in two, based on the values in the
     "redcap_repeat_instrument" column, and assigns the columns necessary for import
-    to CommCare.
+    to CommCare. `external_id_col` is the name of the REDCap column that should be assigned
+    to the external_id property in CommCare.
     """
+    required_cols = [
+        external_id_col,
+        "redcap_repeat_instrument",
+        "record_id",
+    ]
+    for col_name in required_cols:
+        if col_name not in df.columns:
+            raise ValueError(f"Column {col_name} not found in REDCap")
     # Rows with null value in "redcap_repeat_instrument" column and columns that contain
     # only missing values removed.
     cases_df = df.loc[df["redcap_repeat_instrument"].isnull()].dropna(axis=1, how="all")
-    if "cdms_id" in cases_df.columns:
-        cases_df["external_id"] = cases_df["cdms_id"]
-    else:
-        # No cdms_id column added in REDCap yet; generate one for testing purposes.
-        logger.warning(
-            "Using REDCap record_id for external_id! Future uploads may duplicate cases."
-        )
-        cases_df["external_id"] = cases_df.apply(
-            lambda row: f"REDCAP:record_id:{row['record_id']}", axis=1
-        )
+    cases_df["external_id"] = cases_df[external_id_col]
     # Rows with "close_contacts" in "redcap_repeat_instrument" column and columns that
     # contain only missing values removed.
     contacts_df = df.loc[df["redcap_repeat_instrument"] == "close_contacts"].dropna(
