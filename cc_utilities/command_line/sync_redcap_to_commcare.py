@@ -78,10 +78,16 @@ def main_with_args(
             # server time, so the script and server should be run in the same time
             # zone (or this script modified to accept a timezone argument).
             date_begin=state["date_begin"] if not sync_all else None,
-            # Without index_col=False, read_csv() will use the first column
-            # ("record_id") as the index, which is problematic because it's
-            # not unique and is easier to handle as a separate column anyways.
-            df_kwargs={"index_col": False, "dtype": str},
+            df_kwargs={
+                # Without index_col=False, read_csv() will use the first column
+                # ("record_id") as the index, which is problematic because it's
+                # not unique and is easier to handle as a separate column anyways.
+                "index_col": False,
+                # We import everything as a string, to avoid pandas coercing ints
+                # to floats and adding unnecessary decimal points in the data when
+                # uploaded to CommCare.
+                "dtype": str,
+            },
         )
         if len(redcap_records.index) == 0:
             logger.info("No records returned from REDCap; aborting sync.")
