@@ -19,7 +19,7 @@ This repo is for an assortment of scripts for developers working with Commcare.
       - [The workflow](#the-workflow)
       - [Creating the data dict](#creating-the-data-dict)
       - [Running the script](#running-the-script)
-    - [`sync-redcap-to-commcare`](#sync-commcare-app-to-db)
+    - [`sync-redcap-to-commcare`](#sync-redcap-to-commcare)
   - [Logging](#logging)
 
 ## Setup
