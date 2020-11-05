@@ -71,13 +71,14 @@ def main_with_args(
         logger.info("Retrieving and cleaning data from REDCap...")
         redcap_project = redcap.Project(redcap_api_url, redcap_api_key)
         redcap_records = redcap_project.export_records(
-            format="df",
             # date_begin corresponds to the dateRangeBegin field in the REDCap
             # API, which "return[s] only records that have been created or modified
             # *after* a given date/time." Note that REDCap expects this to be in
             # server time, so the script and server should be run in the same time
             # zone (or this script modified to accept a timezone argument).
             date_begin=state["date_begin"] if not sync_all else None,
+            # Tell PyCap to return a pandas DataFrame.
+            format="df",
             df_kwargs={
                 # Without index_col=False, read_csv() will use the first column
                 # ("record_id") as the index, which is problematic because it's
