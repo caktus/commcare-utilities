@@ -35,11 +35,12 @@ def main_with_args(
     redcap_api_key,
     external_id_col,
     state_file,
-    data_dict_path,
     sync_all,
 ):
-    """TBD
-
+    """
+    Script to download case and contact records for the given `redcap_api_url` and
+    `redcap_api_key` and upload them to the provided `commcare_project_name` via
+    CommCare's bulk upload API.
 
     Args:
         commcare_user_name (str): The Commcare username (email address)
@@ -49,7 +50,6 @@ def main_with_args(
         redcap_api_key (str): The REDCap API key
         external_id_col (str): The name of the column in REDCap that contains the external_id for CommCare
         state_file (str): File path to a local file where state about this sync can be kept
-        data_dict_path (str): The path to the Commcare data dictionary (optional)
         sync_all (bool): If set, ignore the date_begin in the state_file and sync all records
     """
 
@@ -155,10 +155,6 @@ def main():
         required=True,
     )
     parser.add_argument(
-        "--data-dict-path",
-        help="The path where the data dictionary CSV is located, for validation purposes (optional)",
-    )
-    parser.add_argument(
         "--sync-all",
         help="If set, ignore the begin date in the state file and sync all records",
         action="store_true",
@@ -172,6 +168,5 @@ def main():
         args.redcap_api_key,
         args.external_id_col,
         args.state_file,
-        args.data_dict_path,
         args.sync_all,
     )
