@@ -22,7 +22,7 @@ def collapse_checkbox_columns(df):
         logger.info(f"Adding column {cc_property} to df")
         df[cc_property] = df.apply(
             lambda row: " ".join(
-                # If REDCap value is not NaN or None and is truthy, return cc_value,
+                # If REDCap value is equal to "1", return cc_value,
                 # else return False (to be filtered out by filter()).
                 filter(
                     bool,
