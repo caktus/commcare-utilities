@@ -18,8 +18,7 @@ setup(
         "SQLAlchemy",
         "phonenumbers",
         "pandas",
-        # FIXME: Add "pycap==1.1.2" once this version is released; see: https://github.com/redcap-tools/PyCap/issues/126
-        # In the meantime, you can pip install https://github.com/redcap-tools/PyCap/archive/master.zip
+        "pycap==1.1.2",  # REDCap API
         "numpy",
         "xlrd",
     ],
