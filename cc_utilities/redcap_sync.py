@@ -5,37 +5,51 @@ import pandas as pd
 from .logger import logger
 
 
-def collapse_checkbox_columns(df):
+def get_cc_properties_and_source_val_lists(df):
     """
-    Converts REDCap-style checkbox columns ("box1___yellow", "box1___green") to CommCare-style
-    checkbox files ("box1": "yellow green"). See test for details.
+    Collects all checkbox columns in `df` that need to be collapsed (those
+    including "___") and returns an iterator of (cc_property, source_val_list)
+    tuples, where source_val_list is a list of (redcap_col, cc_value) tuples.
     """
-    df = df.copy()
-    # First, collect the columns that need to be collapsed, in case they don't
-    # all appear together.
     cc_properties = defaultdict(list)
     for redcap_col in [col for col in df.columns if "___" in col]:
         cc_property, cc_value = redcap_col.split("___", 1)
         cc_properties[cc_property].append((redcap_col, cc_value))
-    # Add new column with the checkbox values collapsed into a single column
-    for cc_property, source_val_list in cc_properties.items():
+    return cc_properties.items()
+
+
+def get_checkbox_values(row, source_val_list):
+    """
+    For the given DataFrame row and source_val_list (tuples of (redcap_col, cc_value)),
+    collect the string representations of the checkbox values for CommCare and
+    return the space-delimited list. Intended to be used via DataFrame.apply().
+    """
+    return " ".join(
+        # If REDCap value is equal to "1", return cc_value,
+        # else return False (to be filtered out by filter()).
+        filter(
+            bool,
+            [
+                cc_value
+                if pd.notnull(row[redcap_col]) and row[redcap_col].strip() == "1"
+                else False
+                for redcap_col, cc_value in source_val_list
+            ],
+        )
+    )
+
+
+def collapse_checkbox_columns(df):
+    """
+    Converts REDCap-style checkbox columns ("box1___yellow", "box1___green") to
+    CommCare-style checkbox files ("box1": "yellow green"). See test for details.
+    """
+    df = df.copy()
+    for cc_property, source_val_list in get_cc_properties_and_source_val_lists(df):
+        # Add new column with the checkbox values collapsed into a single column
         logger.info(f"Adding column {cc_property} to df")
         df[cc_property] = df.apply(
-            lambda row: " ".join(
-                # If REDCap value is equal to "1", return cc_value,
-                # else return False (to be filtered out by filter()).
-                filter(
-                    bool,
-                    [
-                        cc_value
-                        if pd.notnull(row[redcap_col])
-                        and row[redcap_col].strip() == "1"
-                        else False
-                        for redcap_col, cc_value in source_val_list
-                    ],
-                )
-            ),
-            axis=1,
+            get_checkbox_values, args=(source_val_list,), axis=1,
         )
         # Remove the obsolete columns
         redcap_cols = [col for col, _ in source_val_list]
