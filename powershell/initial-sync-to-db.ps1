@@ -1,4 +1,4 @@
-$Script:RequiredVars = 'env:CC_USER_NAME', 'env:CC_API_KEY', 'env:CC_PROJECT_NAME', 'env:CC_APP_ID', 'env:CC_DB_URL', 'env:CC_APP_STRUCTURE_FOLDER_PATH', 'env:CC_REPO_PATH'
+$Script:RequiredVars = 'env:CC_USER_NAME', 'env:CC_API_KEY', 'env:CC_PROJECT_NAME', 'env:CC_APP_ID', 'env:CC_DB_URL', 'env:CC_APP_STRUCTURE_FOLDER_PATH', 'env:CC_REPO_PATH', 'env:CC_SINCE_DAYS'
 
 $Script:MissingVars = 0
 
@@ -14,6 +14,9 @@ if ($Script:MissingVars > 0) {
 	exit 1
 }
 
+$script:SinceDateString = (Get-Date).addDays(-$env:CC_SINCE_DAYS).ToString("yyyy-MM-dd")
+
+
 cd $env:CC_REPO_PATH
 .\venv\Scripts\activate.ps1
 
@@ -24,5 +27,5 @@ sync-commcare-app-to-db.exe `
 	--app-id $env:CC_APP_ID `
 	--db-url $env:CC_DB_URL `
 	--app-structure-json-save-folder-path $env:CC_APP_STRUCTURE_FOLDER_PATH
-
+	--since $script:SinceDateString
 exit

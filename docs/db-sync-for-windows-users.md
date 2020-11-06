@@ -53,6 +53,7 @@ Note that this guide does not cover all possible configurations on Windows or th
    - `CC_USER_NAME`: This will be the email address that you use to log in to the CommCare account that you used to create the API key.
    - `CC_APP_STRUCTURE_FOLDER_PATH`: The database sync script saves a JSON file representing the structure of your CommCare instance (in terms of case types and their field names). Set this value to a folder where you'd like to store this JSON file. For instance, if you've stored `commcare-utilities` to your Documents folder, you might set this value to: `C:\Users\<username>\Documents\commcare-utilities\assets`, after creating a folder called `assets` in the `commcare-utilities` folder.
    - `CC_APP_STRUCTURE_FILE_PATH`: This is the full path to the JSON file that will store the application structure data. This file doesn't exist yet, but the script will use a predictable file name for it, so we can set it now. Set this value to `%CC_APP_STRUCTURE_FOLDER_PATH%\app_structure_latest.json`.
+   - `CC_REPO_PATH`: The path to the folder of the `commcare-utilities` repo.
 
     That's it for setting environment variables. Click "OK" to save these changes.
 
@@ -67,10 +68,37 @@ Note that this guide does not cover all possible configurations on Windows or th
     sync-commcare-app-to-db.exe --username %CC_USER_NAME% --api-key %CC_API_KEY% --project %CC_PROJECT_NAME% --app-id %CC_APP_ID% --db_url %CC_DB_URL% --app-structure-json-save-folder-path %CC_APP_STRUCTURE_FOLDER_PATH
     ```
 
-  This script will likely take several minutes to run. It will output logs as it adds tables and columns to the database.
-10. **Confirm your data in your db**:
-11. **Re-run the script with the app structure file**:
+    This script will likely take several minutes to run. It will output logs as it adds tables and columns to the database.
+10. **Confirm your data in your db**: You can confirm that data synced by connecting to your DB using the client of your choice and verifying that new tables have been created and that rows are found.
+11. **Re-run the script with the app structure file**: Finally, try re-running the script, but point it to the `app_structure_latest.json` file to avoid the API call to CommCare. This will cause the script to run considerably faster. From the same terminal you were previously working in, run:
+
+    ```bash
+    sync-commcare-app-to-db.exe --username $env:CC_USER_NAME --api-key $env:CC_API_KEY --project $env:CC_PROJECT_NAME --app-id $env:CC_APP_ID --db_url $env:CC_DB_URL --existing-app-structure-json $env:CC_APP_STRUCTURE_FILE_PATH
+
+    # OR... Command Prompt
+    sync-commcare-app-to-db.exe --username %CC_USER_NAME% --api-key %CC_API_KEY% --project %CC_PROJECT_NAME% --app-id %CC_APP_ID% --db_url %CC_DB_URL% --existing-app-structure-json %CC_APP_STRUCTURE_FILE_PATH
+    ```
 
 ## Setting up a scheduled task
+
+We've included two Powershell scripts in this repository that can be used to easily set up scheduled tasks to sync down your CommCare data to your db.
+
+The first script (`/powershell/initial-sync-to-db.ps1`) relies on making a call to the CommCare API to retrieve case types and their properties.
+
+The second script (`/powershell/sync-to-db-with-structure-json.ps1`) takes advantage of an `app_structure_latest.json` file saved by the first script in a predictable location to avoid this call.
+
+The strategy we recommend is to set up two scheduled tasks: one that runs the first script less frequently (say once a week, or once a day), and another that runs the second script more frequently at the interval your use case requires.
+
+When the first script runs, it will refresh the app_structure_latest.json file, so you'll pick up any new field types. The disadvantage of running the first script is that it takes much longer and it is an intensive call for the CommCare API to process. We want to avoid having the API make many long-running requests. This should not be a problem, as it is unlikely that your app will have new properties more than once a week.
+
+In order for this overall strategy to work, you should initially run `sync-commcare-app-to-db.exe` pulling down all data in your instance, which is what we did in the setup instructions above, the first time we ran the script:
+
+```bash
+sync-commcare-app-to-db.exe --username $env:CC_USER_NAME --api-key $env:CC_API_KEY --project $env:CC_PROJECT_NAME --app-id $env:CC_APP_ID --db_url $env:CC_DB_URL --app-structure-json-save-folder-path $env:CC_APP_STRUCTURE_FOLDER_PATH
+```
+
+After all of your historical data has initially been synced to your db, moving forward, you can request only the most recent X-days of data, which is the strategy we take in `initial-sync-to-db.ps1` and `sync-to-db-with-structure-json.ps1`.
+
+Both Powershell scripts expect an environment variable to be set called `CC_SINCE_DAYS`, which you'll need to set in order for them to run. This variable will determine how many days back from the current day to sync data. So if you set the value as `7`, when either Powershell script runs, it will only request the most recent seven days worth of data.
 
 ## Keeping your package up to date, and getting support
