@@ -107,7 +107,7 @@ To use a pre-existing JSON file and avoid making a request to the Application St
 ```linux
 sync-commcare-app-to-db \
   --username $COMMCARE_USER \
-  --api_key $COMMCARE_API_KEY \
+  --api-key $COMMCARE_API_KEY \
   --project $COMMCARE_PROJECT_NAME \
   --app-id $APPLICATION_ID \
   --db-url $DB_URL \

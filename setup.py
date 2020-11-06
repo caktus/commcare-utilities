@@ -18,7 +18,7 @@ setup(
         "SQLAlchemy",
         "phonenumbers",
         "pandas",
-        "numpy",
+        "numpy==1.19.3",  # windows env chokes on > than this version
         "xlrd",
     ],
     entry_points={

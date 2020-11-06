@@ -26,10 +26,12 @@ FINAL_REPORT_FILE_NAME_PART = "final_report"
 WB_CONTACT_SHEET_NAME = "contacts"
 
 
-def convert_xl_wb_to_csv_string_io(wb_path, sheet_name=WB_CONTACT_SHEET_NAME):
+def convert_xl_wb_to_csv_string_io(wb_path, sheet_name):
     """Used to accomodate Excel workbook inputs
-
     Converts an Excel workbook into a string IO representing the data as a CSV.
+
+    NB: We use this approach rather than using pd.read_excel because we need all values
+    to be treated as text and read_excel can lead to inferred data types we don't want
     """
     path = Path(wb_path).expanduser()
     wb = load_workbook(path)
@@ -75,7 +77,8 @@ def main_with_args(
         commcare_user_name (str): The Commcare username (email address)
         commcare_api_key (str): A Commcare API key for the user
         commcare_project_name (str): The Commcare project to which contacts will be imported
-        legacy_case_data_path (str): Path to a CSV containing contacts to be imported
+        legacy_case_data_path (str): Path to an Excel file or CSV containing contacts
+            to be imported
         data_dictionary_path (str): Path to a CSV of a data dict used to validate user-
             supplied contact data. Note that this asset is based on but distinct from
             the data dict provided in the CommCare dashboard. It should have the
@@ -101,22 +104,20 @@ def main_with_args(
     data_dict["first_name"]["required"] = True
     data_dict["last_name"]["required"] = True
 
-    # Pandas infers data types, and that's not helpful in this context. For validation
-    # and normalization purposes, we need all inputs to be strings.
-
     logger.info(f"Loading legacy contact data at {legacy_case_data_path}")
 
-    # the main script wants a CSV file, but users may supply Excel wbs. If wb supplied
+    # Pandas infers data types, and that's not helpful in this context. For validation
+    # and normalization purposes, we need all inputs to be strings.
+    # The main script wants a CSV file, but users may supply Excel wbs. If wb supplied
     # we convert the `contacts` sheet into a CSV string IO
     case_data_file = (
         legacy_case_data_path
         if legacy_case_data_path.endswith(".csv")
         else convert_xl_wb_to_csv_string_io(legacy_case_data_path)
     )
+
     # avoid unexpected data type conversions. we just treat everything as string.
-    raw_case_data_df = pd.read_csv(case_data_file, keep_default_na=False).astype(
-        "string"
-    )
+    raw_case_data_df = pd.read_csv(case_data_file, keep_default_na=False, dtype=str)
     if rename_columns:
         col_map_string = ", ".join([f"{k} -> {v}" for (k, v) in rename_columns.items()])
         logger.info(f"Renaming columns: {col_map_string}")
