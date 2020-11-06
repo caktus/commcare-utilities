@@ -19,7 +19,7 @@ setup(
         "phonenumbers",
         "pandas",
         "pycap==1.1.2",  # REDCap API
-        "numpy",
+        "numpy==1.19.3",  # windows env chokes on > than this version
         "xlrd",
     ],
     entry_points={
