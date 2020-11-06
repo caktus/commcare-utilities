@@ -1,4 +1,4 @@
-$Script:RequiredVars = 'env:CC_USER', 'env:CC_API_KEY', 'env:CC_PROJECT', 'env:CC_APP_ID', 'env:CC_BACKUP_DB_URL', 'env:CC_APP_STRUCTURE_FILE_PATH', 'env:CC_SINCE_DAYS', 'env:CC_REPO_PATH'
+$Script:RequiredVars = 'env:CC_USER_NAME', 'env:CC_API_KEY', 'env:CC_PROJECT_NAME', 'env:CC_APP_ID', 'env:CC_DB_URL', 'env:CC_APP_STRUCTURE_FILE_PATH', 'env:CC_REPO_PATH', 'env:CC_SINCE_DAYS',
 
 $Script:MissingVars = 0
 
