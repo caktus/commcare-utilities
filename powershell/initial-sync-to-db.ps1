@@ -1,16 +1,16 @@
-$RequiredVars = 'env:CC_USER', 'env:CC_API_KEY', 'env:CC_PROJECT', 'env:CC_APP_ID', 'env:CC_BACKUP_DB_URL', 'env:CC_APP_STRUCTURE_SAVE_FOLDER', '$env:CC_REPO_PATH'
+$Script:RequiredVars = 'env:CC_USER', 'env:CC_API_KEY', 'env:CC_PROJECT', 'env:CC_APP_ID', 'env:CC_BACKUP_DB_URL', 'env:CC_APP_STRUCTURE_SAVE_FOLDER', 'env:CC_REPO_PATH'
 
-$MissingVars = 0
+$Script:MissingVars = 0
 
-foreach ($var in $RequiredVars) {
+foreach ($var in $Script:RequiredVars) {
 	if (-not (Test-Path $var)) {
 		echo "Expected $var to be set but it isn't"
 		$Script:MissingVars++
 	}
 }
 
-if ($MissingVars > 0) {
-	echo "$MissingVars env vars were not set that need to be. Exiting"
+if ($Script:MissingVars > 0) {
+	echo "$Script:MissingVars env vars were not set that need to be. Exiting"
 	exit 1
 }
 
