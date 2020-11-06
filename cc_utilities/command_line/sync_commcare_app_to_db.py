@@ -305,9 +305,12 @@ def main_with_args(
             f"Some case types were not found: {', '.join(unfound_requested_case_types)}"
         )
         logger.info("Will continue processing the other requested case types")
-    # we'll try to sync the requested case types minus the unfound ones
-    to_sync_case_types = list(
-        set(case_types).difference(set(unfound_requested_case_types))
+    # we'll try to sync the requested case types minus the unfound ones if subset
+    # requested, and if no subset requested, we'll sync all found case types
+    to_sync_case_types = (
+        list(set(case_types).difference(set(unfound_requested_case_types)))
+        if case_types
+        else list(set([k for k in all_case_types_with_properties.keys()]))
     )
     # filter `all_case_types_with_properties` down to only ones that are in our
     # list of `to_sync_case_types`
