@@ -32,7 +32,7 @@ Note that this guide does not cover all possible configurations on Windows or th
 4. **Install the dependencies into your virtual environment**: From the same command prompt you used in the previous step, run following command:
 
     ```bash
-    pip install .
+    pip install -e .
     ```
 
 5. **Install database drivers**: Next, you'll need to separately install the database driver for the SQL database you're using. Assuming you're using SQL Server, from the same command prompt as in the previous step, run:
