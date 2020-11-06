@@ -26,7 +26,7 @@ FINAL_REPORT_FILE_NAME_PART = "final_report"
 WB_CONTACT_SHEET_NAME = "contacts"
 
 
-def convert_xl_wb_to_csv_string_io(wb_path, sheet_name):
+def convert_xl_wb_to_csv_string_io(wb_path, sheet_name=WB_CONTACT_SHEET_NAME):
     """Used to accomodate Excel workbook inputs
     Converts an Excel workbook into a string IO representing the data as a CSV.
 
