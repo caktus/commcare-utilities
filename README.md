@@ -19,6 +19,7 @@ This repo is for an assortment of scripts for developers working with Commcare.
       - [The workflow](#the-workflow)
       - [Creating the data dict](#creating-the-data-dict)
       - [Running the script](#running-the-script)
+    - [`sync-redcap-to-commcare`](#sync-redcap-to-commcare)
   - [Logging](#logging)
 
 ## Setup
@@ -217,6 +218,60 @@ bulk-upload-legacy-contact-data --username $COMMCARE_USER --apikey $COMMCARE_API
 ```
 
 Note that the `--contactKeyValDict` is an optional argument. Any key-value pairs provided for this option will be added to all contacts created by the script.
+
+### `sync-redcap-to-commcare`
+
+This script is intended to sync case and contact data from a REDCap project to a corresponding CommCare contact tracing application. It assumes that:
+
+* the project includes `redcap_repeat_instrument` called `"close_contacts"`
+* checkbox fields are separated by a triple underscore (`___`) and the part after the triple underscore should be placed in a space-separated string property in CommCare (see `collapse_checkbox_columns()`)
+* the column names in REDCap should otherwise be copied as-is to CommCare
+
+To use the script, see its `--help` output:
+
+```
+sync-redcap-to-commcare --help
+usage: sync-redcap-to-commcare [-h] --username COMMCARE_USER_NAME --apikey
+                               COMMCARE_API_KEY --project
+                               COMMCARE_PROJECT_NAME --redcap-api-url
+                               REDCAP_API_URL --redcap-api-key REDCAP_API_KEY
+                               --external-id-col EXTERNAL_ID_COL --state-file
+                               STATE_FILE [--sync-all]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --username COMMCARE_USER_NAME
+                        The Commcare username (email address)
+  --apikey COMMCARE_API_KEY
+                        A Commcare API key
+  --project COMMCARE_PROJECT_NAME
+                        The Commcare project name
+  --redcap-api-url REDCAP_API_URL
+                        The REDCap API URL
+  --redcap-api-key REDCAP_API_KEY
+                        A REDCap API key
+  --external-id-col EXTERNAL_ID_COL
+                        Name of column in REDCap that should be used as the
+                        external_id in CommCare
+  --state-file STATE_FILE
+                        The path where state should be read and saved
+  --sync-all            If set, ignore the begin date in the state file and
+                        sync all records
+```
+
+Sample command:
+
+```linux
+sync-redcap-to-commcare \
+  --username=$COMMCARE_USERNAME \
+  --apikey=$COMMCARE_API_KEY \
+  --project=$COMMCARE_PROJECT \
+  --redcap-api-url=$REDCAP_API_URL \
+  --redcap-api-key=$REDCAP_API_KEY \
+  --external-id-col=our_mrs_id \
+  --state-file=redcap_test.yaml \
+  --sync-all
+```
 
 ## Logging
 
