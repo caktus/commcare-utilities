@@ -19,13 +19,13 @@ $script:SinceDateString = (Get-Date).addDays(-$env:CC_SINCE_DAYS).ToString("yyyy
 cd $env:CC_REPO_PATH
 .\venv\Scripts\activate.ps1
 
-sync-commcare-app-to-db `
-	--username $env:CC_USER `
+sync-commcare-app-to-db.exe `
+	--username $env:CC_USER_NAME `
 	--api-key $env:CC_API_KEY `
 	--project $env:CC_PROJECT_NAME `
 	--app-id $env:CC_APP_ID `
 	--db-url $env:CC_DB_URL `
-	--existing-app-structure-json $env:CC_APP_STRUCTURE_FOLDER_PATH `
+	--existing-app-structure-json $env:CC_APP_STRUCTURE_FILE_PATH `
 	--since $script:SinceDateString
 
 exit
