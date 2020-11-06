@@ -61,10 +61,10 @@ Note that this guide does not cover all possible configurations on Windows or th
 
     ```bash
     # Powershell...
-    sync-commcare-app-to-db.exe --username $env:CC_USER_NAME --api_key $env:CC_API_KEY --project $env:CC_PROJECT_NAME --app_id $env:CC_APP_ID --db_url $env:CC_DB_URL --app-structure-json-save-folder-path $env:CC_APP_STRUCTURE_FOLDER_PATH
+    sync-commcare-app-to-db.exe --username $env:CC_USER_NAME --api-key $env:CC_API_KEY --project $env:CC_PROJECT_NAME --app-id $env:CC_APP_ID --db_url $env:CC_DB_URL --app-structure-json-save-folder-path $env:CC_APP_STRUCTURE_FOLDER_PATH
 
     # OR... Command Prompt
-    sync-commcare-app-to-db.exe --username %CC_USER_NAME% --api_key %CC_API_KEY% --project %CC_PROJECT_NAME% --app_id %CC_APP_ID% --db_url %CC_DB_URL% --app-structure-json-save-folder-path %CC_APP_STRUCTURE_FOLDER_PATH
+    sync-commcare-app-to-db.exe --username %CC_USER_NAME% --api-key %CC_API_KEY% --project %CC_PROJECT_NAME% --app-id %CC_APP_ID% --db_url %CC_DB_URL% --app-structure-json-save-folder-path %CC_APP_STRUCTURE_FOLDER_PATH
     ```
 
   This script will likely take several minutes to run. It will output logs as it adds tables and columns to the database.
