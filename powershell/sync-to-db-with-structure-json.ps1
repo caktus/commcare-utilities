@@ -1,4 +1,4 @@
-$RequiredVars = '$env:CC_USER', '$env:CC_API_KEY', '$env:CC_PROJECT', '$env:CC_APP_ID', '$env:CC_BACKUP_DB_URL', '$env:CC_APP_STRUCTURE_FILE_PATH', '$env:CC_SINCE_DAYS', '$env:CC_REPO_PATH'
+$RequiredVars = 'env:CC_USER', 'env:CC_API_KEY', 'env:CC_PROJECT', 'env:CC_APP_ID', 'env:CC_BACKUP_DB_URL', 'env:CC_APP_STRUCTURE_FILE_PATH', 'env:CC_SINCE_DAYS', 'env:CC_REPO_PATH'
 
 $MissingVars = 0
 
@@ -10,7 +10,6 @@ foreach ($var in $RequiredVars) {
 }
 
 if ($MissingVars > 0) {
-
 	echo "$MissingVars env vars were not set that need to be. Exiting"
 	exit 1
 }
