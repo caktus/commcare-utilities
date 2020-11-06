@@ -3,7 +3,7 @@ $RequiredVars = '$env:CC_USER', '$env:CC_API_KEY', '$env:CC_PROJECT', '$env:CC_A
 $MissingVars = 0
 
 foreach ($var in $RequiredVars) {
-	if (-not Test-Path $var) {
+	if (-not (Test-Path $var)) {
 		echo "Expected $var to be set but it isn't"
 		$Script:MissingVars++
 	}
