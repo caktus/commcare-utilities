@@ -62,10 +62,10 @@ Note that this guide does not cover all possible configurations on Windows or th
 
     ```bash
     # Powershell...
-    sync-commcare-app-to-db.exe --username $env:CC_USER_NAME --api-key $env:CC_API_KEY --project $env:CC_PROJECT_NAME --app-id $env:CC_APP_ID --db_url $env:CC_DB_URL --app-structure-json-save-folder-path $env:CC_APP_STRUCTURE_FOLDER_PATH
+    sync-commcare-app-to-db.exe --username $env:CC_USER_NAME --api-key $env:CC_API_KEY --project $env:CC_PROJECT_NAME --app-id $env:CC_APP_ID --db-url $env:CC_DB_URL --app-structure-json-save-folder-path $env:CC_APP_STRUCTURE_FOLDER_PATH
 
     # OR... Command Prompt
-    sync-commcare-app-to-db.exe --username %CC_USER_NAME% --api-key %CC_API_KEY% --project %CC_PROJECT_NAME% --app-id %CC_APP_ID% --db_url %CC_DB_URL% --app-structure-json-save-folder-path %CC_APP_STRUCTURE_FOLDER_PATH
+    sync-commcare-app-to-db.exe --username %CC_USER_NAME% --api-key %CC_API_KEY% --project %CC_PROJECT_NAME% --app-id %CC_APP_ID% --db-url %CC_DB_URL% --app-structure-json-save-folder-path %CC_APP_STRUCTURE_FOLDER_PATH
     ```
 
     This script will likely take several minutes to run. It will output logs as it adds tables and columns to the database.
@@ -73,10 +73,10 @@ Note that this guide does not cover all possible configurations on Windows or th
 11. **Re-run the script with the app structure file**: Finally, try re-running the script, but point it to the `app_structure_latest.json` file to avoid the API call to CommCare. This will cause the script to run considerably faster. From the same terminal you were previously working in, run:
 
     ```bash
-    sync-commcare-app-to-db.exe --username $env:CC_USER_NAME --api-key $env:CC_API_KEY --project $env:CC_PROJECT_NAME --app-id $env:CC_APP_ID --db_url $env:CC_DB_URL --existing-app-structure-json $env:CC_APP_STRUCTURE_FILE_PATH
+    sync-commcare-app-to-db.exe --username $env:CC_USER_NAME --api-key $env:CC_API_KEY --project $env:CC_PROJECT_NAME --app-id $env:CC_APP_ID --db-url $env:CC_DB_URL --existing-app-structure-json $env:CC_APP_STRUCTURE_FILE_PATH
 
     # OR... Command Prompt
-    sync-commcare-app-to-db.exe --username %CC_USER_NAME% --api-key %CC_API_KEY% --project %CC_PROJECT_NAME% --app-id %CC_APP_ID% --db_url %CC_DB_URL% --existing-app-structure-json %CC_APP_STRUCTURE_FILE_PATH
+    sync-commcare-app-to-db.exe --username %CC_USER_NAME% --api-key %CC_API_KEY% --project %CC_PROJECT_NAME% --app-id %CC_APP_ID% --db-url %CC_DB_URL% --existing-app-structure-json %CC_APP_STRUCTURE_FILE_PATH
     ```
 
 ## Setting up a scheduled task
@@ -94,7 +94,7 @@ When the first script runs, it will refresh the app_structure_latest.json file, 
 In order for this overall strategy to work, you should initially run `sync-commcare-app-to-db.exe` pulling down all data in your instance, which is what we did in the setup instructions above, the first time we ran the script:
 
 ```bash
-sync-commcare-app-to-db.exe --username $env:CC_USER_NAME --api-key $env:CC_API_KEY --project $env:CC_PROJECT_NAME --app-id $env:CC_APP_ID --db_url $env:CC_DB_URL --app-structure-json-save-folder-path $env:CC_APP_STRUCTURE_FOLDER_PATH
+sync-commcare-app-to-db.exe --username $env:CC_USER_NAME --api-key $env:CC_API_KEY --project $env:CC_PROJECT_NAME --app-id $env:CC_APP_ID --db-url $env:CC_DB_URL --app-structure-json-save-folder-path $env:CC_APP_STRUCTURE_FOLDER_PATH
 ```
 
 After all of your historical data has initially been synced to your db, moving forward, you can request only the most recent X-days of data, which is the strategy we take in `initial-sync-to-db.ps1` and `sync-to-db-with-structure-json.ps1`.
