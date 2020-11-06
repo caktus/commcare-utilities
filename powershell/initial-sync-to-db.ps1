@@ -17,8 +17,8 @@ if ($Script:MissingVars > 0) {
 cd $env:CC_REPO_PATH
 .\venv\Scripts\activate.ps1
 
-sync-commcare-app-to-db `
-	--username $env:CC_USER `
+sync-commcare-app-to-db.exe `
+	--username $env:CC_USER_NAME `
 	--api-key $env:CC_API_KEY `
 	--project $env:CC_PROJECT_NAME `
 	--app-id $env:CC_APP_ID `
