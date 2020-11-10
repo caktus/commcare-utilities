@@ -57,18 +57,19 @@ def main():
         project_slug, required_vars["PROJECT_AGENCY_OWNER_LOOKUP_PATH"]
     )
 
-    drop_columns = os.environ.get("DROP_COLUMNS")
-    if drop_columns:
-        drop_columns = drop_columns.split(",")
+    drop_columns_after = os.environ.get("DROP_COLUMNS_AFTER")
+    if drop_columns_after:
         logger.info(
-            f"Altering original workbook, dropping columns: {', '.join(drop_columns)}"
+            f"Altering original workbook, dropping columns after colum "
+            f"{drop_columns_after}"
         )
         # open the Excel workbook and delete the columns then save it
         path = pathlib.Path(file_path).expanduser()
         wb = load_workbook(path)
         ws = wb[WB_CONTACT_SHEET_NAME]
-        for col in drop_columns:
-            ws.delete_cols(column_index_from_string(col), 1)
+        # we drop from after the drop_columns_after index to fifty columns across
+        # just to give more than comfortable buffer
+        ws.delete_cols(column_index_from_string(drop_columns_after) + 1, 50)
         wb.save(path)
 
     rename_columns_json_path = os.environ.get("RENAME_COLUMNS_JSON_PATH")
