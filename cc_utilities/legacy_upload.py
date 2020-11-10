@@ -401,7 +401,10 @@ def validate_phone_number_field(raw_value, country_code="US"):
     # if this field is blank we just treat it as valid
     if raw_value in EMPTY_PHONE_VALUES:
         return True
-    number = phonenumbers.parse(raw_value, country_code)
+    try:
+        number = phonenumbers.parse(raw_value, country_code)
+    except phonenumbers.NumberParseException:
+        return False
     return phonenumbers.is_valid_number(number)
 
 
