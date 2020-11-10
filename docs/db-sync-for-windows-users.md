@@ -7,7 +7,7 @@ Note that this guide does not cover all possible configurations on Windows or th
 - [CommCare db sync setup for Windows](#commcare-db-sync-setup-for-windows)
   - [Setup, configuration and first run](#setup-configuration-and-first-run)
   - [Setting up a scheduled task](#setting-up-a-scheduled-task)
-  - [Keeping your package up to date, and getting support](#keeping-your-package-up-to-date-and-getting-support)
+  - [Keeping your package up to date and reporting problems](#keeping-your-package-up-to-date-and-reporting-problems)
 
 ## Setup, configuration and first run
 
@@ -101,4 +101,8 @@ After all of your historical data has initially been synced to your db, moving f
 
 Both Powershell scripts expect an environment variable to be set called `CC_SINCE_DAYS`, which you'll need to set in order for them to run. This variable will determine how many days back from the current day to sync data. So if you set the value as `7`, when either Powershell script runs, it will only request the most recent seven days worth of data.
 
-## Keeping your package up to date, and getting support
+## Keeping your package up to date and reporting problems
+
+You should consider periodically pulling down changes to this repository in order to update your code with any bug fixes that come out. If you cloned this repository from GitHub, you can do that by running `git pull` in the from the root folder of this repository.
+
+If you encounter any bugs or unexpected behavior, [please file an issue on this repo](https://github.com/caktus/commcare-utilities/issues)!
