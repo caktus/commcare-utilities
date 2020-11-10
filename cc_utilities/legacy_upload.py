@@ -100,7 +100,7 @@ def clean_raw_case_data_df(df, data_dict):
 
     def _remove_chars(val, removable_chars=removeable_chars):
         for char in removable_chars:
-            val.replace(char, "")
+            val = val.replace(char, "")
         return val
 
     for col in cleanup_cols:
