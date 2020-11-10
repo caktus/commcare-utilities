@@ -11,6 +11,7 @@ from openpyxl import load_workbook
 
 from cc_utilities.legacy_upload import (
     LegacyUploadError,
+    clean_raw_case_data_df,
     generate_commcare_case_report_url,
     generate_commcare_external_id,
     load_data_dict,
@@ -144,14 +145,15 @@ def main_with_args(
         )
         raise LegacyUploadError(msg)
 
-    # Even though we converted to string above, there will still be NA values
-    # so here we convert those to empty string when we pass in to the validation
-    # function.
+    # Some pre-validation clean is required
+    cleaned_case_data_df = clean_raw_case_data_df(raw_case_data_df, data_dict)
+
+    case_data_df = validate_legacy_case_data(cleaned_case_data_df, data_dict)
+
     logger.info(
         "Validating row values in legacy contact data CSV against data dictionary"
     )
     now_string = datetime.now().strftime("%m-%d-%Y_%H-%M")
-    case_data_df = validate_legacy_case_data(raw_case_data_df.fillna(""), data_dict)
     validation_report_name = (
         f"{Path(legacy_case_data_path).stem}_{VALIDATION_REPORT_FILE_NAME_PART}_"
         f"{now_string}.xlsx"

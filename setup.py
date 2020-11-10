@@ -5,8 +5,8 @@ setup(
     version="1.0.0",
     description="Helpful utilities for working with CommCare",
     url="https://github.com/caktus/commcare-utilities",
-    author="Benjamin White",
-    author_email="pypy@benjamineugenewhite.com",
+    author="Caktus Consulting Group, LLC",
+    author_email="team@caktusgroup.com",
     license="MIT",
     packages=["cc_utilities", "cc_utilities.command_line"],
     install_requires=[
@@ -18,6 +18,7 @@ setup(
         "SQLAlchemy",
         "phonenumbers",
         "pandas",
+        "pycap==1.1.2",  # REDCap API
         "numpy==1.19.3",  # windows env chokes on > than this version
         "xlrd",
     ],
@@ -28,6 +29,7 @@ setup(
             "bulk-upload-legacy-contact-data=cc_utilities.command_line.bulk_upload_legacy_contact_data:main",
             "sync-commcare-app-to-db=cc_utilities.command_line.sync_commcare_app_to_db:main",
             "easy-bulk-upload-contacts=cc_utilities.command_line.user_friendly_bulk_contact_upload:main",
+            "sync-redcap-to-commcare=cc_utilities.command_line.sync_redcap_to_commcare:main",
         ]
     },
     zip_safe=False,

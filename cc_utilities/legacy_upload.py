@@ -65,6 +65,50 @@ def get_commcare_cases_by_external_id_with_backoff(
     return cases
 
 
+def clean_raw_case_data_df(df, data_dict):
+    """Clean up a dataframe of raw case data ahead of validation and normalization
+
+    Sometimes users provide data with strange idiosyncracies such as new lines in
+    phone number fields (stemming from copy-pasta). This function fixes that problem
+
+    Additionally, it converts all NA values to empty strings.
+
+    Args:
+
+        df (object): A pandas dataframe
+        data_dict (dict): A dictionary whose keys are `col_name`s and whose values
+            are a dict.
+
+    Returns:
+        df: A dataframe
+    """
+    # we need empty strings not NaN or other default missing vals, which will create
+    # downstream problems. Note that this also effectively copies the dataframe
+    # into a new variable, so we won't have side effect on the df passed to function
+    df = df.fillna("")
+    cleanup_column_types = [
+        "date",
+        "phone_number",
+        "multi_select",
+        "number",
+        "select",
+    ]
+    cleanup_cols = [
+        col for col in df.columns if data_dict[col]["data_type"] in cleanup_column_types
+    ]
+    removeable_chars = ["\n", "\r"]
+
+    def _remove_chars(val, removable_chars=removeable_chars):
+        for char in removable_chars:
+            val.replace(char, "")
+        return val
+
+    for col in cleanup_cols:
+        df[col] = df[col].apply(lambda val: _remove_chars(val.strip()))
+
+    return df
+
+
 def validate_case_data_columns(column_names, allowed_columns, required_columns=None):
     """Determine if all columns are allowed and all required columns appear
 
