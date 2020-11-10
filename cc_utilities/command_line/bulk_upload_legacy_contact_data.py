@@ -165,7 +165,9 @@ def main_with_args(
         right_index=True,
     )
     logger.info(f"Generating validation report at {validation_report_path}")
-    report_df.to_excel(validation_report_path, index=False)
+    report_df.to_excel(
+        validation_report_path, index=False, sheet_name=WB_CONTACT_SHEET_NAME
+    )
     num_invalid = len(case_data_df[~case_data_df["is_valid"]])
     if not case_data_df["is_valid"].all() and reject_all_if_any_invalid_rows:
         msg = (
@@ -255,7 +257,7 @@ def main_with_args(
     final_report_path = PurePath(reporting_path).joinpath(final_report_name)
     final_df.drop(["contact_id"], inplace=True, axis=1)
     logger.info(f"Generating a final report at {final_report_path}")
-    final_df.to_excel(final_report_path, index=False)
+    final_df.to_excel(final_report_path, index=False, sheet_name=WB_CONTACT_SHEET_NAME)
     logger.info("I am quite done now.")
 
 
