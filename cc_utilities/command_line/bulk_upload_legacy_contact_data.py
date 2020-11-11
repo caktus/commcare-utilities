@@ -295,6 +295,15 @@ def main():
         dest="reporting_path",
     )
     parser.add_argument(
+        "--requiredOneOfs",
+        help=(
+            "Space-separated list of columns for which at least one value must be "
+            "valid and non-null for a row"
+        ),
+        dest="required_one_ofs",
+        nargs="+",
+    )
+    parser.add_argument(
         "--contactKeyValDict",
         help=(
             "Additional key/value pairs to add to all uploaded contacts, supplied as "
@@ -312,6 +321,7 @@ def main():
             args.legacy_case_data_path,
             args.data_dictionary_path,
             args.reporting_path,
+            required_one_ofs=args.required_one_ofs,
             **args.contact_kwargs,
         )
     except Exception:
