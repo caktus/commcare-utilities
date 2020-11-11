@@ -470,6 +470,125 @@ def get_validation_fn(col_name, data_dict):
         )
 
 
+def _accumulate_row_validation_problems(
+    row,
+    colname=None,
+    is_missing_required_error=False,
+    fails_required_one_ofs=False,
+    required_one_ofs=None,
+):
+    """Helper for accumulating validation problems across columns for a given row
+
+    Args:
+        row (object): A Pandas dataframe row
+        colname (string): Optional. A name of a column validating for.
+        is_missing_required_error (bool): Defaults to False. If `True` will generate
+            a validation error message about a missing required value
+        fails_required_one_ofs (bool): Defaults to False. If `True` will generate
+            a validation error message about a row that doesn't have at least one
+            of several "one-of" required values
+        required_one_ofs (list): A list of required one ofs to be included in a
+            validation message about required one ofs.
+
+    Returns:
+        str: A string of accumulated validation problem messages (i.e., what was
+        there already + new validation problem messages)
+    """
+    required_one_ofs = required_one_ofs if required_one_ofs else []
+
+    if fails_required_one_ofs:
+        assert required_one_ofs
+    assert not all([is_missing_required_error, fails_required_one_ofs])
+    if is_missing_required_error:
+        msg = f"A value must be supplied for {colname}"
+    elif fails_required_one_ofs:
+        msg = (
+            f"A valid value must be supplied for one of the following "
+            f"columns: {required_one_ofs}"
+        )
+    else:
+        msg = f"Invalid value for {colname}"
+    return (
+        ", ".join([row["validation_problems"], msg])
+        if row["validation_problems"]
+        else msg
+    )
+
+
+def validate_and_annotate_row_values(df, data_dict, drop_columns=None):
+    """"""
+    drop_columns = drop_columns if drop_columns else []
+    df = df.copy(deep=True)
+    for col in df.drop(drop_columns, axis=1).columns:
+        df["tmp_col_is_valid"] = df[col].apply(get_validation_fn(col, data_dict))
+        df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
+        df["validation_problems"] = np.where(
+            df["tmp_col_is_valid"],
+            df["validation_problems"],
+            df.apply(_accumulate_row_validation_problems, colname=col, axis=1),
+        )
+        df.drop(columns=["tmp_col_is_valid"], inplace=True)
+    return df
+
+
+def validate_and_annotate_required_values(df, data_dict):
+    """ """
+    df = df.copy(deep=True)
+    # validate no required values are missing
+    for col_name in [col for col in data_dict if data_dict[col]["required"]]:
+        df["tmp_col_is_valid"] = df[col_name].apply(lambda x: x not in ("", None))
+        df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
+        df["validation_problems"] = np.where(
+            df["tmp_col_is_valid"],
+            df["validation_problems"],
+            df.apply(
+                _accumulate_row_validation_problems,
+                colname=col_name,
+                is_missing_required_error=True,
+                axis=1,
+            ),
+        )
+        df.drop(columns=["tmp_col_is_valid"], inplace=True)
+    return df
+
+
+def validate_and_annotate_one_of_required(df, data_dict, required_one_ofs=None):
+    """"""
+    required_one_ofs = required_one_ofs if required_one_ofs else []
+    df = df.copy(deep=True)
+
+    def _ensure_one_of_required(row, required_one_ofs, data_dict):
+        # if no required_one_ofs sent over, then row is inherently valid for this rule
+        if len(required_one_ofs) == 0:
+            return True
+
+        is_valid = False
+        # if any of the required one ofs has a value that's valid, `is_valid` flips
+        # to `True`
+        for col_name in required_one_ofs:
+            if row[col_name] and get_validation_fn(col_name, data_dict)(row[col_name]):
+                is_valid = True
+                break
+        return is_valid
+
+    df["tmp_col_is_valid"] = df.apply(
+        _ensure_one_of_required, args=(required_one_ofs, data_dict), axis=1
+    )
+    df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
+    # accumulate the validation problems on only those rows that got a new validation
+    # problem in this step, which will be indicated by "tmp_col_is_valid" being False
+    df[~df["tmp_col_is_valid"]]["validation_problems"] = df[
+        ~df["tmp_col_is_valid"]
+    ].apply(
+        _accumulate_row_validation_problems,
+        fails_required_one_ofs=True,
+        required_one_ofs=required_one_ofs,
+        axis=1,
+    )
+    df.drop(columns=["tmp_col_is_valid"], inplace=True)
+    return df
+
+
 def validate_legacy_case_data(df, data_dict, required_one_ofs=None):
     """Validate user-supplied legacy case data based on a data dictionary
 
@@ -486,84 +605,16 @@ def validate_legacy_case_data(df, data_dict, required_one_ofs=None):
     """
     required_one_ofs = required_one_ofs if required_one_ofs else []
 
-    # helper function for accumulating validation problems across columns for a given
-    # row
-    def _accumulate_row_validation_problems(
-        row,
-        colname=None,
-        is_missing_required_error=False,
-        fails_required_one_ofs=False,
-        required_one_ofs=None,
-    ):
-        required_one_ofs = required_one_ofs if required_one_ofs else []
-
-        assert not all([is_missing_required_error, fails_required_one_ofs])
-        if is_missing_required_error:
-            msg = f"A value must be supplied for {colname}"
-        elif fails_required_one_ofs:
-            msg = (
-                f"A valid value must be supplied for one of the following "
-                f"columns: {required_one_ofs}"
-            )
-        else:
-            msg = f"Invalid value for {colname}"
-        return (
-            ", ".join([row["validation_problems"], msg])
-            if row["validation_problems"]
-            else msg
-        )
-
     df = df.copy(deep=True)
     df["is_valid"] = True
     df["validation_problems"] = None
-    for col in df.drop(["is_valid", "validation_problems"], axis=1).columns:
-        df["tmp_col_is_valid"] = df[col].apply(get_validation_fn(col, data_dict))
-        df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
-        df["validation_problems"] = np.where(
-            df["tmp_col_is_valid"],
-            df["validation_problems"],
-            df.apply(_accumulate_row_validation_problems, colname=col, axis=1),
-        )
-        df.drop(columns=["tmp_col_is_valid"], inplace=True)
-    # validate no required values are missing
-    for col_name in [col for col in data_dict if data_dict[col]["required"]]:
-        df["tmp_col_is_valid"] = df[col_name].apply(lambda x: x not in ("", None))
-        df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
-        df["validation_problems"] = np.where(
-            df["tmp_col_is_valid"],
-            df["validation_problems"],
-            df.apply(
-                _accumulate_row_validation_problems,
-                colname=col_name,
-                is_missing_required_error=True,
-                axis=1,
-            ),
-        )
-        df.drop(columns=["tmp_col_is_valid"], inplace=True)
-
-    def _ensure_one_of_required(row, required_one_ofs, data_dict):
-        if len(required_one_ofs) == 0:
-            return True
-        is_valid = False
-
-        for col_name in required_one_ofs:
-            if row[col_name] and get_validation_fn(col_name, data_dict)(row[col_name]):
-                is_valid = True
-        return is_valid
-
-    df["tmp_col_is_valid"] = df.apply(
-        _ensure_one_of_required, args=(required_one_ofs, data_dict), axis=1
+    df = validate_and_annotate_row_values(
+        df, data_dict, ["is_valid", "validation_problems"]
     )
-    df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
-    df[~df["tmp_col_is_valid"]]["validation_problems"] = df[
-        ~df["tmp_col_is_valid"]
-    ].apply(
-        _accumulate_row_validation_problems,
-        fails_required_one_ofs=True,
-        required_one_ofs=required_one_ofs,
-        axis=1,
+    df = validate_and_annotate_required_values(df, data_dict)
+    df = validate_and_annotate_one_of_required(
+        df, data_dict, required_one_ofs=required_one_ofs
     )
-    df.drop(columns=["tmp_col_is_valid"], inplace=True)
 
     return df
 

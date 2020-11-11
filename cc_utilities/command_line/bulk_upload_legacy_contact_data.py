@@ -178,7 +178,7 @@ def main_with_args(
     num_invalid = len(case_data_df[~case_data_df["is_valid"]])
     if not case_data_df["is_valid"].all() and reject_all_if_any_invalid_rows:
         msg = (
-            f"{num_invalid} rows were invalid and `reject_all_if_an_invalid_rows` "
+            f"{num_invalid} rows were invalid and `reject_all_if_any_invalid_rows` "
             f"is True. No case data will be uploaded. See details in the validation "
             f"report at {validation_report_path}."
         )
