@@ -405,9 +405,7 @@ def validate_phone_number_field(raw_value, country_code="US"):
         number = phonenumbers.parse(raw_value, country_code)
         return phonenumbers.is_valid_number(number)
     except Exception:
-        import pdb
-
-        pdb.set_trace()
+        return False
 
 
 def normalize_phone_number(raw_value, col_name=None, country_code="US"):
@@ -472,7 +470,7 @@ def get_validation_fn(col_name, data_dict):
         )
 
 
-def validate_legacy_case_data(df, data_dict):
+def validate_legacy_case_data(df, data_dict, required_one_ofs=None):
     """Validate user-supplied legacy case data based on a data dictionary
 
     Args:
@@ -481,19 +479,32 @@ def validate_legacy_case_data(df, data_dict):
         data_dict (dict): A dictionary whose keys are `col_name`s and
             whose values are a dict whose keys are field, group, allowed_values,
             data_type, and required
+        required_one_ofs (list): Optional. A list of columns from which at least one
+            must have a valid, non-null value per row
     Returns:
         obj: A copy of the original df, with additional columns with validation data.
     """
     # helper function for accumulating validation problems across columns for a given
     # row
     def _accumulate_row_validation_problems(
-        row, colname, is_missing_required_error=False
+        row,
+        colname=None,
+        is_missing_required_error=False,
+        fails_required_one_ofs=False,
+        required_one_ofs=None,
     ):
-        msg = (
-            f"Invalid value for {colname}"
-            if not is_missing_required_error
-            else f"A value must be supplied for {colname}"
-        )
+        required_one_ofs = required_one_ofs if required_one_ofs else []
+
+        assert not all([is_missing_required_error, fails_required_one_ofs])
+        if is_missing_required_error:
+            msg = f"A value must be supplied for {colname}"
+        elif fails_required_one_ofs:
+            msg = (
+                f"A valid value must be supplied for one of the following "
+                f"columns: {required_one_ofs}"
+            )
+        else:
+            msg = f"Invalid value for {colname}"
         return (
             ", ".join([row["validation_problems"], msg])
             if row["validation_problems"]
@@ -527,6 +538,30 @@ def validate_legacy_case_data(df, data_dict):
             ),
         )
         df.drop(columns=["tmp_col_is_valid"], inplace=True)
+
+    def _ensure_one_of_required(row, required_one_ofs, data_dict):
+        is_valid = False
+
+        for col_name in required_one_ofs:
+            if row[col_name] and get_validation_fn(col_name, data_dict)(row[col_name]):
+                is_valid = True
+        return is_valid
+
+    df["tmp_col_is_valid"] = df.apply(
+        _ensure_one_of_required, args=(required_one_ofs, data_dict), axis=1
+    )
+    df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
+    df["validation_problems"] = np.where(
+        df["tmp_col_is_valid"],
+        df["validation_problems"],
+        df.apply(
+            _accumulate_row_validation_problems,
+            fails_required_one_ofs=True,
+            required_one_ofs=required_one_ofs,
+            axis=1,
+        ),
+    )
+    df.drop(columns=["tmp_col_is_valid"], inplace=True)
 
     return df
 
