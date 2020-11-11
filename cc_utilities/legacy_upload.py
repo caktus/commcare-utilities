@@ -5,7 +5,6 @@ from urllib.parse import urljoin
 from uuid import uuid4
 
 import dateparser
-import numpy as np
 import phonenumbers
 from retry import retry
 
@@ -15,7 +14,11 @@ from cc_utilities.common import (
     get_commcare_cases,
     upload_data_to_commcare,
 )
-from cc_utilities.constants import CASE_REPORT_URL, EMPTY_PHONE_VALUES
+from cc_utilities.constants import (
+    CASE_REPORT_URL,
+    EMPTY_PHONE_VALUES,
+    EMPTY_SELECT_VALUES,
+)
 from cc_utilities.logger import logger
 
 MAX_CONTACTS_PER_PARENT_PATIENT = 100
@@ -385,15 +388,19 @@ def normalize_date_field(validated_raw_value):
     return parsed.strftime("%Y-%m-%d")
 
 
-def validate_select_field(value, allowed_values):
+def validate_select_field(raw_value, allowed_values):
     "Validate a value whose CommCare data type is `select`"
-    return any([value == "", value.strip() in allowed_values])
+    if raw_value in EMPTY_SELECT_VALUES:
+        return True
+    return raw_value.strip() in allowed_values
 
 
 def validate_multi_select_field(raw_value, allowed_values):
     "Validate a value whose CommCare data type is `multi_select`"
+    if raw_value in EMPTY_SELECT_VALUES:
+        return True
     values = [val.strip() for val in raw_value.split(",")]
-    return any([len(values) == 0, set(values).issubset(set(allowed_values))])
+    return set(values).issubset(set(allowed_values))
 
 
 def validate_phone_number_field(raw_value, country_code="US"):
@@ -405,9 +412,7 @@ def validate_phone_number_field(raw_value, country_code="US"):
         number = phonenumbers.parse(raw_value, country_code)
         return phonenumbers.is_valid_number(number)
     except Exception:
-        import pdb
-
-        pdb.set_trace()
+        return False
 
 
 def normalize_phone_number(raw_value, col_name=None, country_code="US"):
@@ -472,7 +477,166 @@ def get_validation_fn(col_name, data_dict):
         )
 
 
-def validate_legacy_case_data(df, data_dict):
+def accumulate_row_validation_problems(
+    row,
+    colname=None,
+    is_missing_required_error=False,
+    fails_required_one_ofs=False,
+    required_one_ofs=None,
+):
+    """Helper for accumulating validation problems across columns for a given row
+
+    Args:
+        row (object): A Pandas dataframe row
+        colname (string): Optional. A name of a column validating for.
+        is_missing_required_error (bool): Defaults to False. If `True` will generate
+            a validation error message about a missing required value
+        fails_required_one_ofs (bool): Defaults to False. If `True` will generate
+            a validation error message about a row that doesn't have at least one
+            of several "one-of" required values
+        required_one_ofs (list): A list of required one ofs to be included in a
+            validation message about required one ofs.
+
+    Returns:
+        str: A string of accumulated validation problem messages (i.e., what was
+        there already + new validation problem messages)
+    """
+    required_one_ofs = required_one_ofs if required_one_ofs else []
+
+    if fails_required_one_ofs:
+        assert required_one_ofs
+    assert not all([is_missing_required_error, fails_required_one_ofs])
+    if is_missing_required_error:
+        msg = f"A value must be supplied for {colname}"
+    elif fails_required_one_ofs:
+        msg = (
+            f"A valid value must be supplied for one of the following "
+            f"columns: {required_one_ofs}"
+        )
+    else:
+        msg = f"Invalid value for {colname}"
+    return (
+        ", ".join([row["validation_problems"], msg])
+        if row["validation_problems"]
+        else msg
+    )
+
+
+def validate_and_annotate_row_values(df, data_dict, drop_columns=None):
+    """Determine if each row is valid, and if not, annotate row with validation problems
+
+    Args:
+
+        df (object): Pandas dataframe
+        data_dict (dict): A dictionary whose keys are `col_name`s and
+            whose values are a dict whose keys are field, group, allowed_values,
+            data_type, and required
+        drop_columns (list): Optional. If included, these columns will not be considered
+            when validating
+    Returns:
+        df: A new df based on original plus validation information
+    """
+    drop_columns = drop_columns if drop_columns else []
+    df = df.copy(deep=True)
+    for col in df.drop(drop_columns, axis=1).columns:
+        df["tmp_col_is_valid"] = df[col].apply(get_validation_fn(col, data_dict))
+        df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
+        # if `row["tmp_col_is_valid"] is False` we apply
+        # accumulate_row_validation_problems, otherwise we return the existing
+        # value for `row["validation_problems"]`
+        df["validation_problems"] = df.apply(
+            lambda row: accumulate_row_validation_problems(row, colname=col)
+            if not row["tmp_col_is_valid"]
+            else row["validation_problems"],
+            axis=1,
+        )
+        df.drop(columns=["tmp_col_is_valid"], inplace=True)
+    return df
+
+
+def validate_and_annotate_required_values(df, data_dict):
+    """Determine if all required values have been fulfilled, and annotate accordingly
+
+    NB: This does not validate if those required values are valid. That is assumed
+    to have happened in a previous step.
+
+    Args:
+        df (object): Pandas dataframe
+        data_dict (dict): A dictionary whose keys are `col_name`s and
+            whose values are a dict whose keys are field, group, allowed_values,
+            data_type, and required
+    Returns:
+        df: A new df based on original plus validation information
+    """
+    df = df.copy(deep=True)
+    # validate no required values are missing
+    for col_name in [col for col in data_dict if data_dict[col]["required"]]:
+        df["tmp_col_is_valid"] = df[col_name].apply(lambda x: x not in ("", None))
+        df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
+        # if `row["tmp_col_is_valid"] is False` we apply
+        # accumulate_row_validation_problems, otherwise we return the existing
+        # value for `row["validation_problems"]`
+        df["validation_problems"] = df.apply(
+            lambda row: accumulate_row_validation_problems(
+                row, colname=col_name, is_missing_required_error=True
+            )
+            if not row["tmp_col_is_valid"]
+            else row["validation_problems"],
+            axis=1,
+        )
+        df.drop(columns=["tmp_col_is_valid"], inplace=True)
+    return df
+
+
+def validate_and_annotate_one_of_required(df, data_dict, required_one_ofs=None):
+    """Determine if "one-of" required logic is valid, and annotate accordingly
+
+    Args:
+        df (object): Pandas dataframe
+        data_dict (dict): A dictionary whose keys are `col_name`s and
+            whose values are a dict whose keys are field, group, allowed_values,
+            data_type, and required
+        required_one_ofs (list): Optional. A list of columns from which at least one
+            must have a valid, non-null value per row
+    Returns:
+        df: A new df based on original plus validation information
+    """
+    required_one_ofs = required_one_ofs if required_one_ofs else []
+    df = df.copy(deep=True)
+
+    def _ensure_one_of_required(row, required_one_ofs, data_dict):
+        # if no required_one_ofs sent over, then row is inherently valid for this rule
+        if len(required_one_ofs) == 0:
+            return True
+
+        is_valid = False
+        # if any of the required one ofs has a value that's valid, `is_valid` flips
+        # to `True`
+        for col_name in required_one_ofs:
+            if row[col_name] and get_validation_fn(col_name, data_dict)(row[col_name]):
+                is_valid = True
+                break
+        return is_valid
+
+    df["tmp_col_is_valid"] = df.apply(
+        _ensure_one_of_required, args=(required_one_ofs, data_dict), axis=1
+    )
+    df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
+    # if `row["tmp_col_is_valid"] is False` we apply accumulate_row_validation_problems,
+    # otherwise we return the existing value for `row["validation_problems"]`
+    df["validation_problems"] = df.apply(
+        lambda row: accumulate_row_validation_problems(
+            row, fails_required_one_ofs=True, required_one_ofs=required_one_ofs
+        )
+        if not row["tmp_col_is_valid"]
+        else row["validation_problems"],
+        axis=1,
+    )
+    df.drop(columns=["tmp_col_is_valid"], inplace=True)
+    return df
+
+
+def validate_legacy_case_data(df, data_dict, required_one_ofs=None):
     """Validate user-supplied legacy case data based on a data dictionary
 
     Args:
@@ -481,53 +645,23 @@ def validate_legacy_case_data(df, data_dict):
         data_dict (dict): A dictionary whose keys are `col_name`s and
             whose values are a dict whose keys are field, group, allowed_values,
             data_type, and required
+        required_one_ofs (list): Optional. A list of columns from which at least one
+            must have a valid, non-null value per row
     Returns:
         obj: A copy of the original df, with additional columns with validation data.
     """
-    # helper function for accumulating validation problems across columns for a given
-    # row
-    def _accumulate_row_validation_problems(
-        row, colname, is_missing_required_error=False
-    ):
-        msg = (
-            f"Invalid value for {colname}"
-            if not is_missing_required_error
-            else f"A value must be supplied for {colname}"
-        )
-        return (
-            ", ".join([row["validation_problems"], msg])
-            if row["validation_problems"]
-            else msg
-        )
+    required_one_ofs = required_one_ofs if required_one_ofs else []
 
     df = df.copy(deep=True)
     df["is_valid"] = True
     df["validation_problems"] = None
-    for col in df.drop(["is_valid", "validation_problems"], axis=1).columns:
-        df["tmp_col_is_valid"] = df[col].apply(get_validation_fn(col, data_dict))
-        df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
-        df["validation_problems"] = np.where(
-            df["tmp_col_is_valid"],
-            df["validation_problems"],
-            df.apply(_accumulate_row_validation_problems, colname=col, axis=1),
-        )
-        df.drop(columns=["tmp_col_is_valid"], inplace=True)
-    # validate no required values are missing
-    for col_name in [col for col in data_dict if data_dict[col]["required"]]:
-        df["tmp_col_is_valid"] = df[col_name].apply(lambda x: x not in ("", None))
-        df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
-        df["validation_problems"] = np.where(
-            df["tmp_col_is_valid"],
-            df["validation_problems"],
-            df.apply(
-                _accumulate_row_validation_problems,
-                colname=col_name,
-                is_missing_required_error=True,
-                axis=1,
-            ),
-        )
-        df.drop(columns=["tmp_col_is_valid"], inplace=True)
-
+    df = validate_and_annotate_row_values(
+        df, data_dict, ["is_valid", "validation_problems"]
+    )
+    df = validate_and_annotate_required_values(df, data_dict)
+    df = validate_and_annotate_one_of_required(
+        df, data_dict, required_one_ofs=required_one_ofs
+    )
     return df
 
 

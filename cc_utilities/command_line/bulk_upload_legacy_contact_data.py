@@ -57,6 +57,7 @@ def main_with_args(
     reject_all_if_any_invalid_rows=True,
     prompt_user=True,
     rename_columns=None,
+    required_one_ofs=None,
     **contact_kwargs,
 ):
     """The main routine. Create CommCare contacts based on legacy contact data.
@@ -92,9 +93,13 @@ def main_with_args(
             this behavior to be suppressed, so this param is to support that use case.
         rename_columns (dict): Optional. Keys are original column names, values are new
             names.
+        required_one_ofs (list): Optional. A list of columns from which at least one
+            must have a valid, non-null value per row
         contact_kwargs (dict): Optional key/value pairs that will be added to each
             generated contact.
     """
+    required_one_ofs = required_one_ofs if required_one_ofs else []
+
     logger.info(f"Loading data dictionary at {data_dictionary_path}")
     data_dict = load_data_dict(data_dictionary_path)
     assert all(
@@ -145,10 +150,12 @@ def main_with_args(
         )
         raise LegacyUploadError(msg)
 
-    # Some pre-validation clean is required
+    # Some pre-validation cleanup is required
     cleaned_case_data_df = clean_raw_case_data_df(raw_case_data_df, data_dict)
 
-    case_data_df = validate_legacy_case_data(cleaned_case_data_df, data_dict)
+    case_data_df = validate_legacy_case_data(
+        cleaned_case_data_df, data_dict, required_one_ofs=required_one_ofs
+    )
 
     logger.info(
         "Validating row values in legacy contact data CSV against data dictionary"
@@ -171,7 +178,7 @@ def main_with_args(
     num_invalid = len(case_data_df[~case_data_df["is_valid"]])
     if not case_data_df["is_valid"].all() and reject_all_if_any_invalid_rows:
         msg = (
-            f"{num_invalid} rows were invalid and `reject_all_if_an_invalid_rows` "
+            f"{num_invalid} rows were invalid and `reject_all_if_any_invalid_rows` "
             f"is True. No case data will be uploaded. See details in the validation "
             f"report at {validation_report_path}."
         )
@@ -288,6 +295,15 @@ def main():
         dest="reporting_path",
     )
     parser.add_argument(
+        "--requiredOneOfs",
+        help=(
+            "Space-separated list of columns for which at least one value must be "
+            "valid and non-null for a row"
+        ),
+        dest="required_one_ofs",
+        nargs="+",
+    )
+    parser.add_argument(
         "--contactKeyValDict",
         help=(
             "Additional key/value pairs to add to all uploaded contacts, supplied as "
@@ -305,6 +321,7 @@ def main():
             args.legacy_case_data_path,
             args.data_dictionary_path,
             args.reporting_path,
+            required_one_ofs=args.required_one_ofs,
             **args.contact_kwargs,
         )
     except Exception:
