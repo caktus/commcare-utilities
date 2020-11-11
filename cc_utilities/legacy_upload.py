@@ -14,7 +14,11 @@ from cc_utilities.common import (
     get_commcare_cases,
     upload_data_to_commcare,
 )
-from cc_utilities.constants import CASE_REPORT_URL, EMPTY_PHONE_VALUES
+from cc_utilities.constants import (
+    CASE_REPORT_URL,
+    EMPTY_PHONE_VALUES,
+    EMPTY_SELECT_VALUES,
+)
 from cc_utilities.logger import logger
 
 MAX_CONTACTS_PER_PARENT_PATIENT = 100
@@ -384,15 +388,19 @@ def normalize_date_field(validated_raw_value):
     return parsed.strftime("%Y-%m-%d")
 
 
-def validate_select_field(value, allowed_values):
+def validate_select_field(raw_value, allowed_values):
     "Validate a value whose CommCare data type is `select`"
-    return any([value == "", value.strip() in allowed_values])
+    if raw_value in EMPTY_SELECT_VALUES:
+        return True
+    return raw_value.strip() in allowed_values
 
 
 def validate_multi_select_field(raw_value, allowed_values):
     "Validate a value whose CommCare data type is `multi_select`"
+    if raw_value in EMPTY_SELECT_VALUES:
+        return True
     values = [val.strip() for val in raw_value.split(",")]
-    return any([len(values) == 0, set(values).issubset(set(allowed_values))])
+    return set(values).issubset(set(allowed_values))
 
 
 def validate_phone_number_field(raw_value, country_code="US"):
