@@ -98,6 +98,8 @@ def main_with_args(
         contact_kwargs (dict): Optional key/value pairs that will be added to each
             generated contact.
     """
+    required_one_ofs = required_one_ofs if required_one_ofs else []
+
     logger.info(f"Loading data dictionary at {data_dictionary_path}")
     data_dict = load_data_dict(data_dictionary_path)
     assert all(

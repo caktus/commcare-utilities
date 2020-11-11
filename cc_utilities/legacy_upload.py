@@ -484,6 +484,8 @@ def validate_legacy_case_data(df, data_dict, required_one_ofs=None):
     Returns:
         obj: A copy of the original df, with additional columns with validation data.
     """
+    required_one_ofs = required_one_ofs if required_one_ofs else []
+
     # helper function for accumulating validation problems across columns for a given
     # row
     def _accumulate_row_validation_problems(
@@ -540,6 +542,8 @@ def validate_legacy_case_data(df, data_dict, required_one_ofs=None):
         df.drop(columns=["tmp_col_is_valid"], inplace=True)
 
     def _ensure_one_of_required(row, required_one_ofs, data_dict):
+        if len(required_one_ofs) == 0:
+            return True
         is_valid = False
 
         for col_name in required_one_ofs:
@@ -551,15 +555,13 @@ def validate_legacy_case_data(df, data_dict, required_one_ofs=None):
         _ensure_one_of_required, args=(required_one_ofs, data_dict), axis=1
     )
     df["is_valid"] = df["is_valid"] & df["tmp_col_is_valid"]
-    df["validation_problems"] = np.where(
-        df["tmp_col_is_valid"],
-        df["validation_problems"],
-        df.apply(
-            _accumulate_row_validation_problems,
-            fails_required_one_ofs=True,
-            required_one_ofs=required_one_ofs,
-            axis=1,
-        ),
+    df[~df["tmp_col_is_valid"]]["validation_problems"] = df[
+        ~df["tmp_col_is_valid"]
+    ].apply(
+        _accumulate_row_validation_problems,
+        fails_required_one_ofs=True,
+        required_one_ofs=required_one_ofs,
+        axis=1,
     )
     df.drop(columns=["tmp_col_is_valid"], inplace=True)
 
