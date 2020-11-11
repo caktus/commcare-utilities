@@ -31,7 +31,7 @@ def main():
         "PROJECT_AGENCY_OWNER_LOOKUP_PATH": os.environ.get(
             "PROJECT_AGENCY_OWNER_LOOKUP_PATH"
         ),
-        "REQUIRED_ONE_OF": os.environ.get("REQUIRED_ONE_OF"),
+        "REQUIRED_ONE_OFS": os.environ.get("REQUIRED_ONE_OFS"),
     }
 
     missing = [k for k in required_vars if not required_vars[k]]
@@ -40,7 +40,7 @@ def main():
         print(f"The following env var(s) need(s) to be set: {', '.join(missing)}")
         sys.exit()
 
-    required_one_ofs = required_vars["REQUIRED_ONE_OF"].split(",")
+    required_one_ofs = required_vars["REQUIRED_ONE_OFS"].split(",")
 
     while True:
         file_path = input("Enter the path to the contact data Excel file to upload:  ")
