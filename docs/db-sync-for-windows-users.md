@@ -38,7 +38,7 @@ Note that this guide does not cover all possible configurations on Windows or th
 5. **Install database drivers**: Next, you'll need to separately install the database driver for the SQL database you're using. Assuming you're using SQL Server, from the same command prompt as in the previous step, run:
 
     ```bash
-    pip install pydobc
+    pip install pyodbc
     ```
 
     At this point,  you can close the command line terminal you've been working in so far, as we'll be setting up environment variables, and will need to start a new terminal in order to pick up the new environment variables.
