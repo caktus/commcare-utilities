@@ -422,7 +422,7 @@ def normalize_phone_number(raw_value, col_name=None, country_code="US"):
     return (
         f"{number.country_code}{number.national_number}"
         if col_name == "contact_phone_number"
-        else number.national_number
+        else str(number.national_number)
     )
 
 

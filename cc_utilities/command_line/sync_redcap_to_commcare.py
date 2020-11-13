@@ -7,7 +7,11 @@ import yaml
 
 from cc_utilities.common import upload_data_to_commcare
 from cc_utilities.logger import logger
-from cc_utilities.redcap_sync import collapse_checkbox_columns, split_cases_and_contacts
+from cc_utilities.redcap_sync import (
+    collapse_checkbox_columns,
+    normalize_phone_cols,
+    split_cases_and_contacts,
+)
 
 
 def get_redcap_state(state_file):
@@ -34,6 +38,7 @@ def main_with_args(
     redcap_api_url,
     redcap_api_key,
     external_id_col,
+    phone_cols,
     state_file,
     sync_all,
 ):
@@ -49,6 +54,7 @@ def main_with_args(
         redcap_api_url (str): The URL to the REDCap API server
         redcap_api_key (str): The REDCap API key
         external_id_col (str): The name of the column in REDCap that contains the external_id for CommCare
+        phone_cols (list): List of phone columns that should be normalized for CommCare
         state_file (str): File path to a local file where state about this sync can be kept
         sync_all (bool): If set, ignore the date_begin in the state_file and sync all records
     """
@@ -93,8 +99,10 @@ def main_with_args(
         if len(redcap_records.index) == 0:
             logger.info("No records returned from REDCap; aborting sync.")
         else:
-            cases_df, contacts_df = redcap_records.pipe(collapse_checkbox_columns).pipe(
-                split_cases_and_contacts, external_id_col
+            cases_df, contacts_df = (
+                redcap_records.pipe(collapse_checkbox_columns)
+                .pipe(normalize_phone_cols, phone_cols)
+                .pipe(split_cases_and_contacts, external_id_col)
             )
             logger.info(
                 f"Uploading {len(cases_df.index)} found patients (cases) to CommCare..."
@@ -106,20 +114,15 @@ def main_with_args(
                 "external_id",
                 commcare_user_name,
                 commcare_api_key,
+                create_new_cases="off",
                 search_field="external_id",
             )
-            logger.info(
-                f"Uploading {len(contacts_df.index)} found contacts to CommCare..."
-            )
-            upload_data_to_commcare(
-                contacts_df,
-                commcare_project_name,
-                "contact",
-                "external_id",
-                commcare_user_name,
-                commcare_api_key,
-                search_field="external_id",
-            )
+            if len(contacts_df.index) > 0:
+                # FIXME: The contact columns don't appear to match directly to CommCare, and
+                # will need to be renamed before being imported.
+                logger.warning(
+                    f"Found {len(contacts_df.index)} contacts, but contact sync not implemented."
+                )
         state["date_begin"] = next_date_begin
     finally:
         # Whatever happens, don't keep our lock open.
@@ -157,6 +160,11 @@ def main():
         required=True,
     )
     parser.add_argument(
+        "--phone-cols",
+        nargs="*",
+        help="Space-separated name(s) of phone columns to normalize",
+    )
+    parser.add_argument(
         "--state-file",
         help="The path where state should be read and saved",
         required=True,
@@ -174,6 +182,7 @@ def main():
         args.redcap_api_url,
         args.redcap_api_key,
         args.external_id_col,
+        args.phone_cols,
         args.state_file,
         args.sync_all,
     )
