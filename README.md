@@ -19,6 +19,7 @@ This repo is for an assortment of scripts for developers working with Commcare.
       - [The workflow](#the-workflow)
       - [Creating the data dict](#creating-the-data-dict)
       - [Running the script](#running-the-script)
+    - [`easy-bulk-upload-contacts`](#easy-bulk-upload-contacts)
     - [`sync-redcap-to-commcare`](#sync-redcap-to-commcare)
   - [Logging](#logging)
 
@@ -218,6 +219,33 @@ bulk-upload-legacy-contact-data --username $COMMCARE_USER --apikey $COMMCARE_API
 Note that the `--requiredOneofs` is an optional argument. Space separated values sent in here will be used to generate a list of columns for which each row must have at least one valid, non-null value in order for the row to be declared valid.
 
 `--contactKeyValDict` is also an optional argument. Any key-value pairs provided for this option will be added to all contacts created by the script.
+
+### `easy-bulk-upload-contacts`
+
+This script wraps `bulk-upload-legacy-contact-data` to make it easier for less-technical users to use the script, and to make it easier to process higher volumes of bulk upload requests.
+
+This script gets run with a single initial command:
+
+```bash
+easy-bulk-upload-contacts
+```
+
+It then prompts the user to provide 3 pieces of information: the path to the Excel file to be uploaded, the path to store report assets in, and the project name.
+
+For this script tor run, all the setup steps that are in [`bulk-upload-legacy-contact-data`](#bulk-upload-legacy-contact-data) must be completed.
+
+The following environment variables *must* be in place for this script to work:
+
+- `COMMCARE_USER_NAME`: The login of CommCare user that created the API key
+- `COMMCARE_API_KEY`: An API key for CommCare
+- `COMMCARE_CONTACT_DATA_DICT_CSV`: The full path to the data dict against which the data to be uploaded will be validated (see the [Creating the data dict section](#creating-the-data-dict) for details)
+- `PROJECT_AGENCY_OWNER_LOOKUP_PATH`: The full path to a CSV file containing mappings of CommCare project names to owner_ids.
+
+Additionally, the following environment variables may be optionally set:
+
+- `DROP_COLUMNS_AFTER`: This should be set to the letter name of an Excel worksheet column (for instance, "M"). Users providing data may be asked to use an Excel template that contains additional formatting/validation columns that appear to the right of the data-containing columns. If a value is provided for this env var, columns *after* (not inclusive) the `DROP_COLUMNS_AFTER` column will be dropped from the spreadsheet. This allows us to provide data-providing users with an Excel template that helps prevent invalid data from being provided, and stops those additional columns from making the data appear to be invalid during the validation step in this script.
+- `REQUIRED_ONE_OFS`: This variable should be a comma-separated list of column names for which at least one non-null, valid value must appear for each row, for a row to be considered valid. For instance, it could be set to `commcare_email_address,contact_phone_number`, which would require that at least one of those values be valid and non-null for each row.
+- `RENAME_COLUMNS_JSON_PATH`: This variable can be set to the path of a JSON file containing a mapping of template Excel column names to valid CommCare field names. This allows us to use more meaningful names in the upload template ("email_address" instead of "commcare_email_address", "date_of_birth" instead of "dob"), and then to transform those names to their CommCare contact field counterparts before the validation step.
 
 ### `sync-redcap-to-commcare`
 
