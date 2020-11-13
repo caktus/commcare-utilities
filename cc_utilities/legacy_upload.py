@@ -406,13 +406,13 @@ def validate_multi_select_field(raw_value, allowed_values):
 def validate_phone_number_field(raw_value, country_code="US"):
     "Validate a value whose CommCare data type is `phone_number`"
     # if this field is blank we just treat it as valid
+    if raw_value in EMPTY_PHONE_VALUES:
+        return True
     try:
-        if raw_value in EMPTY_PHONE_VALUES:
-            return True
         number = phonenumbers.parse(raw_value, country_code)
-        return phonenumbers.is_valid_number(number)
-    except Exception:
+    except phonenumbers.NumberParseException:
         return False
+    return phonenumbers.is_valid_number(number)
 
 
 def normalize_phone_number(raw_value, col_name=None, country_code="US"):
