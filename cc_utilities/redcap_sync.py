@@ -1,7 +1,9 @@
 from collections import defaultdict
+from functools import partial
 
 import pandas as pd
 
+from .legacy_upload import normalize_phone_number
 from .logger import logger
 
 
@@ -24,18 +26,23 @@ def get_checkbox_values(row, source_val_list):
     collect the string representations of the checkbox values for CommCare and
     return the space-delimited list. Intended to be used via DataFrame.apply().
     """
-    return " ".join(
-        # If REDCap value is equal to "1", return cc_value,
-        # else return False (to be filtered out by filter()).
-        filter(
-            bool,
-            [
-                cc_value
-                if pd.notnull(row[redcap_col]) and row[redcap_col].strip() == "1"
-                else False
-                for redcap_col, cc_value in source_val_list
-            ],
+    return (
+        " ".join(
+            # If REDCap value is equal to "1", return cc_value,
+            # else return False (to be filtered out by filter()).
+            filter(
+                bool,
+                [
+                    cc_value
+                    if pd.notnull(row[redcap_col]) and row[redcap_col].strip() == "1"
+                    else False
+                    for redcap_col, cc_value in source_val_list
+                ],
+            )
         )
+        # If "", return None instead so empty columns can be filtered out properly
+        # by split_cases_and_contacts().
+        or None
     )
 
 
@@ -58,6 +65,18 @@ def collapse_checkbox_columns(df):
     return df
 
 
+def normalize_phone_cols(df, phone_cols):
+    """
+    For the given phone number columns, apply normalize_phone_number().
+    """
+    df = df.copy()
+    for col_name in phone_cols:
+        df[col_name] = df[col_name].apply(
+            partial(normalize_phone_number, col_name=col_name)
+        )
+    return df
+
+
 def split_cases_and_contacts(df, external_id_col):
     """
     Splits a single dataframe of cases and contacts in two, based on the values in the
@@ -68,6 +87,7 @@ def split_cases_and_contacts(df, external_id_col):
     required_cols = [
         external_id_col,
         "redcap_repeat_instrument",
+        "redcap_repeat_instance",
         "record_id",
     ]
     for col_name in required_cols:
@@ -82,18 +102,23 @@ def split_cases_and_contacts(df, external_id_col):
     contacts_df = df.loc[df["redcap_repeat_instrument"] == "close_contacts"].dropna(
         axis=1, how="all"
     )
-    contacts_df["parent_type"] = "patient"
-    contacts_df["parent_external_id"] = contacts_df.apply(
-        lambda row: cases_df.loc[
-            cases_df["record_id"] == row["record_id"], "external_id"
-        ].values[0],
-        axis=1,
-    )
-    contacts_df["external_id"] = contacts_df.apply(
-        lambda row: f"{row['parent_external_id']}:redcap_repeat_instance:{row['redcap_repeat_instance']}",
-        axis=1,
-    )
-    contacts_df.drop(
-        columns=["redcap_repeat_instrument", "redcap_repeat_instance"], inplace=True
-    )
+    if len(contacts_df.index) > 0:
+        contacts_df["parent_type"] = "patient"
+        contacts_df["parent_external_id"] = contacts_df.apply(
+            lambda row: cases_df.loc[
+                cases_df["record_id"] == row["record_id"], "external_id"
+            ].values[0],
+            axis=1,
+        )
+        contacts_df["external_id"] = contacts_df.apply(
+            lambda row: (
+                f"{row['parent_external_id']}:"
+                "redcap_repeat_instance:"
+                f"{row['redcap_repeat_instance']}"
+            ),
+            axis=1,
+        )
+        contacts_df = contacts_df.drop(
+            columns=["redcap_repeat_instrument", "redcap_repeat_instance"]
+        )
     return cases_df, contacts_df
