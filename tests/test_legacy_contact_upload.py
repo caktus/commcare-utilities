@@ -145,8 +145,11 @@ class TestCaseDataValidationLogic:
 
     def test_validate_legacy_case_data_happy_path(self):
         "Show that when given valid data, 'is_valid' is True for each row"
+        required_one_ofs = ["current_smoker", "symptoms_selected"]
         df = validate_legacy_case_data(
-            pd.DataFrame(make_legacy_contacts_data()), CONTACT_DATA_DICT
+            pd.DataFrame(make_legacy_contacts_data()),
+            CONTACT_DATA_DICT,
+            required_one_ofs=required_one_ofs,
         )
         assert df["is_valid"].all()
 
@@ -227,6 +230,28 @@ class TestCaseDataValidationLogic:
         assert ~df.iloc[[change_row_1, change_row_2]]["is_valid"].all()
         assert required_col in df.iloc[change_row_1]["validation_problems"]
         assert required_col in df.iloc[change_row_2]["validation_problems"]
+
+    def test_validate_legacy_case_data_required_one_ofs_invalid(self):
+        """Show that "required one of" validation logic works"""
+        required_one_ofs = ["current_smoker", "symptoms_selected"]
+        change_row_1 = 0
+        change_row_2 = 1
+        data = make_legacy_contacts_data()
+        for col in required_one_ofs:
+            data[change_row_1][col] = None
+            data[change_row_2][col] = ""
+        df = pd.DataFrame(data)
+        df = validate_legacy_case_data(
+            df, CONTACT_DATA_DICT, required_one_ofs=required_one_ofs
+        )
+        assert ~df.iloc[[change_row_1, change_row_2]]["is_valid"].all()
+        for row_idx in [change_row_1, change_row_2]:
+            assert (
+                "one of the following columns"
+                in df.iloc[row_idx]["validation_problems"]
+            )
+            for col in required_one_ofs:
+                assert col in df.iloc[row_idx]["validation_problems"]
 
     def test_validate_case_data_columns_happy_path(self):
         "When given valid col names, `validate_case_data_columns` is True"
@@ -394,6 +419,7 @@ def test_command_line_script_happy_path(
     data = make_legacy_contacts_data(num=200)
     data_dict = contact_data_dict_to_list_of_dicts()
     ad_hoc_contact_key_vals = {"foo": "bar"}
+    required_one_ofs = ["dob", "phone_work"]
     with tempfile.TemporaryDirectory() as data_dir, tempfile.TemporaryDirectory() as report_dir:
         data_path = PurePath(data_dir).joinpath("contacts.csv")
         data_dict_path = PurePath(data_dir).joinpath("data_dict.csv")
@@ -419,6 +445,7 @@ def test_command_line_script_happy_path(
             data_dict_path.as_posix(),
             report_dir,
             prompt_user=False,
+            required_one_ofs=required_one_ofs,
             **ad_hoc_contact_key_vals,
         )
         validation_report_path = next(

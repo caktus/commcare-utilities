@@ -19,6 +19,7 @@ This repo is for an assortment of scripts for developers working with Commcare.
       - [The workflow](#the-workflow)
       - [Creating the data dict](#creating-the-data-dict)
       - [Running the script](#running-the-script)
+    - [`easy-bulk-upload-contacts`](#easy-bulk-upload-contacts)
     - [`sync-redcap-to-commcare`](#sync-redcap-to-commcare)
   - [Logging](#logging)
 
@@ -157,26 +158,24 @@ Finally, note that this script presently is configured to work with US-based pho
 5. Run the script. Assuming the referenced variables are set: `process-numbers-for-sms-capability --db $DB_URL --username $COMMCARE_USER --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT --twilioSID $TWILIO_SID --twilioToken $TWILIO_TOKEN`.
 6. Any new columns added to the DB will be noted in the command-line output of the script.
 
-
 ### `bulk-upload-legacy-contact-data`
 
 This script allows a user to bulk upload legacy contact data into a CommCare project. Its input is a CSV of contacts to be imported, where each column in the CSV is a valid CommCare field for the project instance, along with a data dictionary CSV which is used to validate the contact data to be uploaded.
 
-
 #### The workflow
 
-> **NOTE** This workflow contains the exchange of sensitive PII, so security should be a key conern for all parties involved in preparing, exchanging, procesing this data. The person running this script should, amongst other things, aim to security risks by deleting input data and generated reports as soon as possible after uploading contacts. This person should also be clear with the non-technical stakeholder who is providing the data that security should be a top concern.
+> **NOTE** This workflow contains the exchange of sensitive PII, so security should be a key conern for all parties involved in preparing, exchanging, procesing this data. The person running this script should, amongst other things, aim to minimize security risks by deleting input data and generated reports as soon as possible after uploading contacts. This person should also be clear with the non-technical stakeholder who is providing the data that security should be a top concern.
 
 At a high-level, this script is intended to support the following workflow:
 
 1. A non-technical stakeholder (for instance a point of contact at a public health agency) creates a CSV file (or an Excel file that will later be transformed into a CSV) containing a row for each legacy contact they want to import. In creating this asset, they should consult the data dictionary in their CommCare instance to determine which fields they would like to upload. Ultimately, the column names in the CSV will need to correspond to non-deprecated field names in their dictionary. For any column/row combination, the values supplied will be validated according to the data type of the column and the user-supplied value.  After producing this asset, the non-technical stakeholder shares it with a technical stakeholder who has API access to the CommCare instance.
 2. The technical stakeholder produces a data dictionary CSV, which is based on but modifies the data dictionary export available in CommCare instances. Ultimately, the technical stakeholder will need to create a data dict csv with the following column headers: `field`, `allowed_values`, `data_type` and `required`. Detailed instructions on how to produce this asset are found in the next subsection. Once created, this asset will need to be stored on the same computer that is being used to run this script.
 3. The technical stakeholder runs the legacy upload script pointing to the legacy contact data and the data dictionary.
-4. The script checks to see that only expected column names were encountered, and whether any required column names were missing. If it encounters problems with the columns, this will be logged. The technical stakeholder will then fix these problems if they are obvious (say a misspelled column name) or else reach out to the non-technical stakeholder who provided the data and ask them to resolve the issue and provide updated data.
+4. The script checks to see that only expected column names were encountered, whether any required column names were missing, and that each row has at least one non-null, valid value for a list of "required_one_ofs" columns if that options is used. If it encounters problems with the columns, this will be logged. The technical stakeholder will then fix these problems if they are obvious (say a misspelled column name) or else reach out to the non-technical stakeholder who provided the data and ask them to resolve the issue and provide updated data.
 5. Assuming the previous validation succeeds, the script next validates each row of data. It does this by cross-referencing the column name of each row value against the data dictionary in order to determine the data type and in the case of select and multi-select data types, the allowed values. The script outputs an Excel file with all of the original data plus 2 new columns: `is_valid` which will contain a boolean indicating whether or not the row validated; and `validation_problems` which will be text describing any validation problems encountered for the row.
 6. If row-level validation problems were encountered, the script will exit after creating the validation report. Depending on the problems encountered, the technical user may fix them on their own (say, for instance, for a select field whose values are "yes", "no", and "maybe", there is a row where the typo "yess" appears), or they may return the validation report back to the original user who uploaded the data, asking them to fix the reported issues.
 7. If no validation problems are encountered, the script normalizes row values (for instance, converting date columns to the formatting expected by CommCare).
-8. The next processes contacts in batches of 100. Legacy contacts must be attached to a parent case, and for this, the script creates a stub patient that gets to attached to a batch of up to 100 contacts. For a given batch of <= 100 contacts, the script creates a stub patient, retrieves it via the API to grab the case_id, reuploads the patient to the API to mark it as closed (this has to be done as a separate step), then uploads the batch of contacts to CommCare, setting the stub patient's case_id as the parent_id field for each of these contacts. Finally, for each batch, the stub patient gets retrieved again along with its children, which in this case are contacts. This data is then used to generate a URL where each newly created contact can be viewed in CommCare.
+8. The next step processes contacts in batches of 100. Legacy contacts must be attached to a parent case, and for this, the script creates a stub patient that gets to attached to a batch of up to 100 contacts. For a given batch of <= 100 contacts, the script creates a stub patient, retrieves it via the API to grab the case_id, reuploads the patient to the API to mark it as closed (this has to be done as a separate step), then uploads the batch of contacts to CommCare, setting the stub patient's case_id as the parent_id field for each of these contacts. Finally, for each batch, the stub patient gets retrieved again along with its children, which in this case are contacts. This data is then used to generate a URL where each newly created contact can be viewed in CommCare.
 9. After processing all of the contacts, the script outputs a final report Excel file, which contains all of the originally uploaded data, plus two additional columns: `contact_creation_success` and `commcare_contact_case_url`. The former is a boolean indicating if the row was uploaded, and the latter is a URL where the newly created contact can be viewed in CommCare.
 10. After this is all done, the technical stakeholder should share the final report with the non-technical stakeholder and let them know that there contacts have been uploaded.
 
@@ -214,10 +213,39 @@ Here are the steps to create this asset:
 Assuming you have sourced the appropriate environment variables and that you have the data dictionary CSV and legacy contact data CSV as described above, the following command will run the script:
 
 ```linux
-bulk-upload-legacy-contact-data --username $COMMCARE_USER --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT_NAME --caseDataPath <path-to-contact-data-to-be-uploaded> --dataDictPath <path-to-data-dict> --reportingPath <path-where-reporting-assets-will-be-created> --contactKeyValDict '{"additionalID": "additionalValue"}'
+bulk-upload-legacy-contact-data --username $COMMCARE_USER --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT_NAME --caseDataPath <path-to-contact-data-to-be-uploaded> --dataDictPath <path-to-data-dict> --reportingPath <path-where-reporting-assets-will-be-created> --requiredOneOfs contact_phone_number commcare_email_address --contactKeyValDict '{"additionalID": "additionalValue"}'
 ```
 
-Note that the `--contactKeyValDict` is an optional argument. Any key-value pairs provided for this option will be added to all contacts created by the script.
+Note that the `--requiredOneofs` is an optional argument. Space separated values sent in here will be used to generate a list of columns for which each row must have at least one valid, non-null value in order for the row to be declared valid.
+
+`--contactKeyValDict` is also an optional argument. Any key-value pairs provided for this option will be added to all contacts created by the script.
+
+### `easy-bulk-upload-contacts`
+
+This script wraps `bulk-upload-legacy-contact-data` to make it easier for less-technical users to use the script, and to make it easier to process higher volumes of bulk upload requests.
+
+This script gets run with a single initial command:
+
+```bash
+easy-bulk-upload-contacts
+```
+
+It then prompts the user to provide 3 pieces of information: the path to the Excel file to be uploaded, the path to store report assets in, and the project name.
+
+For this script tor run, all the setup steps that are in [`bulk-upload-legacy-contact-data`](#bulk-upload-legacy-contact-data) must be completed.
+
+The following environment variables *must* be in place for this script to work:
+
+- `COMMCARE_USER_NAME`: The login of CommCare user that created the API key
+- `COMMCARE_API_KEY`: An API key for CommCare
+- `COMMCARE_CONTACT_DATA_DICT_CSV`: The full path to the data dict against which the data to be uploaded will be validated (see the [Creating the data dict section](#creating-the-data-dict) for details)
+- `PROJECT_AGENCY_OWNER_LOOKUP_PATH`: The full path to a CSV file containing mappings of CommCare project names to owner_ids.
+
+Additionally, the following environment variables may be optionally set:
+
+- `DROP_COLUMNS_AFTER`: This should be set to the letter name of an Excel worksheet column (for instance, "M"). Users providing data may be asked to use an Excel template that contains additional formatting/validation columns that appear to the right of the data-containing columns. If a value is provided for this env var, columns *after* (not inclusive) the `DROP_COLUMNS_AFTER` column will be dropped from the spreadsheet. This allows us to provide data-providing users with an Excel template that helps prevent invalid data from being provided, and stops those additional columns from making the data appear to be invalid during the validation step in this script.
+- `RENAME_COLUMNS_JSON_PATH`: This variable can be set to the path of a JSON file containing a mapping of template Excel column names to valid CommCare field names. This allows us to use more meaningful names in the upload template ("email_address" instead of "commcare_email_address", "date_of_birth" instead of "dob"), and then to transform those names to their CommCare contact field counterparts before the validation step.
+- `REQUIRED_ONE_OFS`: This variable should be a comma-separated list of column names for which at least one non-null, valid value must appear for each row, for a row to be considered valid. For instance, it could be set to `commcare_email_address,contact_phone_number`, which would require that at least one of those values be valid and non-null for each row. **Note** that these column names should be CommCare fields, not the user-friendly renamed columns that may be used in an upload template.
 
 ### `sync-redcap-to-commcare`
 

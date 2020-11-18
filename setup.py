@@ -28,6 +28,7 @@ setup(
             "generate-case-export-query-file=cc_utilities.command_line.generate_case_export_query_file:main",
             "bulk-upload-legacy-contact-data=cc_utilities.command_line.bulk_upload_legacy_contact_data:main",
             "sync-commcare-app-to-db=cc_utilities.command_line.sync_commcare_app_to_db:main",
+            "easy-bulk-upload-contacts=cc_utilities.command_line.user_friendly_bulk_contact_upload:main",
             "sync-redcap-to-commcare=cc_utilities.command_line.sync_redcap_to_commcare:main",
         ]
     },

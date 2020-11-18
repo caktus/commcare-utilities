@@ -1,0 +1,19 @@
+sync-commcare-app-to-db \
+	--username $COMMCARE_USER \
+	--api_key $COMMCARE_API_KEY \
+	--project philly-covid19-test \
+	--app-id $PHILLY_ID \
+	--db-url postgres:///philly_commcare_testing \
+	--app-structure-json-save-folder-path ./ \
+	--since 2020-10-15 \
+	--case-types contact
+
+sync-commcare-app-to-db \
+	--username $COMMCARE_USER \
+	--api_key $COMMCARE_API_KEY \
+	--project philly-covid19-test \
+	--app-id $PHILLY_ID \
+	--db-url postgres:///philly_commcare_testing \
+	--existing-app-structure-json ./app_structure_latest.json \
+	--since 2020-10-15 \
+	--case-types contact patient
