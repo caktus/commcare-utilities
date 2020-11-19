@@ -18,6 +18,7 @@ setup(
         "SQLAlchemy",
         "phonenumbers",
         "pandas",
+        "pyyaml",
         "pycap==1.1.2",  # REDCap API
         "numpy==1.19.3",  # windows env chokes on > than this version
         "xlrd",
