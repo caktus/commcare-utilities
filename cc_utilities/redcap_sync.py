@@ -71,8 +71,11 @@ def normalize_phone_cols(df, phone_cols):
     """
     df = df.copy()
     for col_name in phone_cols:
-        df[col_name] = df[col_name].apply(
-            partial(normalize_phone_number, col_name=col_name)
+        # replace N/A values with empty string before normalizing
+        df[col_name] = (
+            df[col_name]
+            .fillna("")
+            .apply(partial(normalize_phone_number, col_name=col_name))
         )
     return df
 

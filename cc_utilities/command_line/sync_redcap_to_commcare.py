@@ -94,10 +94,6 @@ def main_with_args(
                 # to floats and adding unnecessary decimal points in the data when
                 # uploaded to CommCare.
                 "dtype": str,
-                # If field is not present, it might not be converted to an empty string
-                # unless we use this setting:
-                # https://stackoverflow.com/a/43832955/347942
-                "keep_default_na": False,
             },
         )
         if len(redcap_records.index) == 0:

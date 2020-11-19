@@ -34,14 +34,15 @@ def test_collapse_checkbox_columns():
 def test_normalize_phone_cols():
     input_df = pd.DataFrame(
         {
-            "phone1": ["(919) 555-1212", "9195551213", "919-555-1214"],
-            "phone2": ["(919) 555-1215", "9195551216", "919-555-1217"],
+            "phone1": ["(919) 555-1212", "9195551213", float("nan")],
+            "phone2": ["(919) 555-1215", "9195551216", float("nan")],
         }
     )
+    # request cols are normalized and with N/A converted to empty strings
     expected_output_df = pd.DataFrame(
         {
-            "phone1": ["9195551212", "9195551213", "9195551214"],
-            "phone2": ["(919) 555-1215", "9195551216", "919-555-1217"],
+            "phone1": ["9195551212", "9195551213", ""],
+            "phone2": ["(919) 555-1215", "9195551216", float("nan")],
         }
     )
     output_df = normalize_phone_cols(input_df, ["phone1"])
