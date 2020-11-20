@@ -38,7 +38,7 @@ def test_normalize_phone_cols():
             "phone2": ["(919) 555-1215", "9195551216", float("nan")],
         }
     )
-    # request cols are normalized and with N/A converted to empty strings
+    # phone1 col is normalized and with N/A converted to empty string
     expected_output_df = pd.DataFrame(
         {
             "phone1": ["9195551212", "9195551213", ""],
