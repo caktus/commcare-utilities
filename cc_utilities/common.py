@@ -55,7 +55,8 @@ def get_application_structure(
     if not response.ok:
         message = (
             f"Something went wrong retrieving app structure for app with id "
-            f"`{app_id}`"
+            f"`{app_id}`.  The response status code was `{response.status_code}`. "
+            f"The response text was: `{response.text}`"
         )
         info = {
             "commcare_response_status_code": response.status_code,
