@@ -182,7 +182,7 @@ def main():
         args.redcap_api_url,
         args.redcap_api_key,
         args.external_id_col,
-        args.phone_cols,
+        args.phone_cols or [],
         args.state_file,
         args.sync_all,
     )
