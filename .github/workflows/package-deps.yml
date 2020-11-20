@@ -3,7 +3,7 @@ name: package dependencies
 on:
   push:
     branches:
-      - package-deps
+      - main
 
 jobs:
   package-deps:
