@@ -16,17 +16,17 @@ Note that this guide does not cover all possible configurations on Windows or th
 3. **Create and activate a virtual environment**: From a command line environment on the machine that will be running the script, navigate into the `commcare-utilities` folder. Verify that you're using Python 3, then create a virtual environment by running the following command (substituting in the appropriate value for the path to virtual environment portion -- you'll probably want put this in the root of the commcare-utilities folder):
 
     ```bash
-    python -m venv c:\path\to\myenv
+    python -m venv c:\path\to\commcare-utilities-
     ```
 
     This command will create a new virtual environment at the path you specified. Now you need to activate it. To do that, run the following command:
 
     ```bash
     # if using Command Shell
-    C:\> <path-to-venv>\Scripts\activate.bat
+    C:\> <path-to-virtual-env>\Scripts\activate.bat
 
     # if using Powershell
-    C:\> <venv>\Scripts\Activate.ps1
+    C:\> <path-to-virtual-env>\Scripts\Activate.ps1
     ```
 
 4. **Install the dependencies into your virtual environment**: From the same command prompt you used in the previous step, run following command:
@@ -38,7 +38,7 @@ Note that this guide does not cover all possible configurations on Windows or th
 5. **Install database drivers**: Next, you'll need to separately install the database driver for the SQL database you're using. Assuming you're using SQL Server, from the same command prompt as in the previous step, run:
 
     ```bash
-    pip install pydobc
+    pip install pyodbc
     ```
 
     At this point,  you can close the command line terminal you've been working in so far, as we'll be setting up environment variables, and will need to start a new terminal in order to pick up the new environment variables.
@@ -48,7 +48,7 @@ Note that this guide does not cover all possible configurations on Windows or th
 
    - `CC_API_KEY`: You will need to set up an API key in your CommCare dashboard, [as explained here](https://confluence.dimagi.com/display/commcarepublic/Authentication#Authentication-ApiKeyauthentication). Note that CommCare API keys can be whitelisted to a specific IP address. If the IP address of the computer this script will be running on is static, we recommend whitelisting it. Copy your API key from CommCare and save it as the value for `CC_API_KEY`.
    - `CC_APP_ID`: This value can be retreived by logging into your CommCareHQ dashboard, selecting your application from the `Applications` dropdown, then extracting it from the URL of the resulting page. The URL will look like this: `https://www.commcarehq.org/a/<project-name>/apps/view/<this-is-your-app-id>/`.
-   - `CC_DB_URL`: This value is a connection string encompassing the database host, name, port, username, password, and driver. For SQL Server, your database url will look something like this: `mssql+pyodbc//<db-user-name>:<db-password>@<db-host-name>:<db-port>/<db-name>?driver=ODBC+Driver+17+for+SQL+Server`
+   - `CC_DB_URL`: This value is a connection string encompassing the database host, name, port, username, password, and driver. For SQL Server, your database url will look something like this: `mssql+pyodbc://<db-user-name>:<db-password>@<db-host-name>:<db-port>/<db-name>?driver=ODBC+Driver+17+for+SQL+Server`
    - `CC_PROJECT_NAME`: You can find this value in your CommCare dashboard by clicking on Dashboard. This will take you to a page with a URL that looks like this: `https://www.commcarehq.org/a/<project-name>/dasbhoard/project`. Set `CC_PROJECT_NAME` to the value you find for `<project-name>`.
    - `CC_USER_NAME`: This will be the email address that you use to log in to the CommCare account that you used to create the API key. **NOTE** this account will also need to have the `System Admin (API)` user role in order for the script to work.
    - `CC_APP_STRUCTURE_FOLDER_PATH`: The database sync script saves a JSON file representing the structure of your CommCare instance (in terms of case types and their field names). Set this value to a folder where you'd like to store this JSON file. For instance, if you've stored `commcare-utilities` to your Documents folder, you might set this value to: `C:\Users\<username>\Documents\commcare-utilities\assets`, after creating a folder called `assets` in the `commcare-utilities` folder.
