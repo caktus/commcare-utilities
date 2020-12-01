@@ -59,7 +59,9 @@ def do_commcare_export_to_db(
         [f"--{k} {v}" for (k, v) in commcare_export_script_options.items()]
     )
     additional_flags = " ".join([f"--{flag}" for flag in commcare_export_script_flags])
-    commands = " ".join([commands, additional_options, additional_flags]).strip()
+    commands = " ".join(
+        [i for i in (commands, additional_options, additional_flags) if i]
+    ).strip()
     commands = commands.split(" ")
     subprocess.run(commands)
 
