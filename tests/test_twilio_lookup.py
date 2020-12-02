@@ -6,7 +6,7 @@ from faker import Faker
 from cc_utilities.constants import (
     COMMCARE_CAN_SMS_LABEL,
     COMMCARE_CANNOT_SMS_LABEL,
-    COMMCARE_CONTACT_PHONE_FIELD,
+    COMMCARE_PHONE_FIELD,
     TWILIO_INVALID_NUMBER_FOR_REGION_CODE,
     TWILIO_LANDLINE_CODE,
     TWILIO_VOIP_CODE,
@@ -14,7 +14,7 @@ from cc_utilities.constants import (
 from cc_utilities.twilio_lookup import (
     COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME,
     TWILIO_MOBILE_CODE,
-    process_contacts,
+    process_records,
 )
 
 
@@ -69,15 +69,15 @@ class MockTwilioPhoneNumberNonUsRegion:
 class TestBulkProcessNumbersCanReceiveSms:
     """Test business logic around determining if numbers can receive SMS
 
-    `cc_utilities.twilio_lookup.process_contacts` contains the primary business logic
+    `cc_utilities.twilio_lookup.process_records` contains the primary business logic
     for determining if numbers can receive SMS or not. In this test suite, we show
     the expected behavior for a range of expected phone number inputs.
 
     This functionality is ultimately used by
-    `scripts/batch-process-contacts-for-can-receive-sms` which in addition to calling
-    `process_contacts` is also responsible for retrieving unprocessed contacts from
-    db-land, and ultimately propogating results of `process_contacts` back up to
-    CommCare. We only narrowly test the business logic around `process_contacts`.
+    `scripts/process-numbers-for-sms-capabilty` which in addition to calling
+    `process_records` is also responsible for retrieving unprocessed records from
+    db-land, and ultimately propogating results of `process_records` back up to
+    CommCare. We only narrowly test the business logic around `process_records`.
     """
 
     def test_valid_mobile_us_number_can_receive_sms(self, monkeypatch):
@@ -91,13 +91,10 @@ class TestBulkProcessNumbersCanReceiveSms:
         twilio_sid = twilio_token = "xxxxxx"
         fake = Faker("en_US")
         data = [
-            {
-                search_column: uuid.uuid1(),
-                COMMCARE_CONTACT_PHONE_FIELD: fake.phone_number(),
-            }
+            {search_column: uuid.uuid1(), COMMCARE_PHONE_FIELD: fake.phone_number()}
             for _ in range(5)
         ]
-        processed = process_contacts(data, search_column, twilio_sid, twilio_token)
+        processed = process_records(data, search_column, twilio_sid, twilio_token)
         for item in processed:
             assert item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CAN_SMS_LABEL
 
@@ -112,13 +109,10 @@ class TestBulkProcessNumbersCanReceiveSms:
         twilio_sid = twilio_token = "xxxxxx"
         fake = Faker("en_US")
         data = [
-            {
-                search_column: uuid.uuid1(),
-                COMMCARE_CONTACT_PHONE_FIELD: fake.phone_number(),
-            }
+            {search_column: uuid.uuid1(), COMMCARE_PHONE_FIELD: fake.phone_number()}
             for _ in range(5)
         ]
-        processed = process_contacts(data, search_column, twilio_sid, twilio_token)
+        processed = process_records(data, search_column, twilio_sid, twilio_token)
         for item in processed:
             assert (
                 item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
@@ -135,13 +129,10 @@ class TestBulkProcessNumbersCanReceiveSms:
         twilio_sid = twilio_token = "xxxxxx"
         fake = Faker("en_US")
         data = [
-            {
-                search_column: uuid.uuid1(),
-                COMMCARE_CONTACT_PHONE_FIELD: fake.phone_number(),
-            }
+            {search_column: uuid.uuid1(), COMMCARE_PHONE_FIELD: fake.phone_number()}
             for _ in range(5)
         ]
-        processed = process_contacts(data, search_column, twilio_sid, twilio_token)
+        processed = process_records(data, search_column, twilio_sid, twilio_token)
         for item in processed:
             assert (
                 item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
@@ -162,13 +153,10 @@ class TestBulkProcessNumbersCanReceiveSms:
         twilio_sid = twilio_token = "xxxxxx"
         fake = Faker("en_CA")
         data = [
-            {
-                search_column: uuid.uuid1(),
-                COMMCARE_CONTACT_PHONE_FIELD: fake.phone_number(),
-            }
+            {search_column: uuid.uuid1(), COMMCARE_PHONE_FIELD: fake.phone_number()}
             for _ in range(5)
         ]
-        processed = process_contacts(data, search_column, twilio_sid, twilio_token)
+        processed = process_records(data, search_column, twilio_sid, twilio_token)
         for item in processed:
             assert (
                 item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
@@ -179,11 +167,11 @@ class TestBulkProcessNumbersCanReceiveSms:
         search_column = "id"
         twilio_sid = twilio_token = "xxxxxx"
         data = [
-            {search_column: uuid.uuid1(), COMMCARE_CONTACT_PHONE_FIELD: "abcdefg"},
-            {search_column: uuid.uuid1(), COMMCARE_CONTACT_PHONE_FIELD: ""},
-            {search_column: uuid.uuid1(), COMMCARE_CONTACT_PHONE_FIELD: " "},
+            {search_column: uuid.uuid1(), COMMCARE_PHONE_FIELD: "abcdefg"},
+            {search_column: uuid.uuid1(), COMMCARE_PHONE_FIELD: ""},
+            {search_column: uuid.uuid1(), COMMCARE_PHONE_FIELD: " "},
         ]
-        processed = process_contacts(data, search_column, twilio_sid, twilio_token)
+        processed = process_records(data, search_column, twilio_sid, twilio_token)
         for item in processed:
             assert (
                 item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
