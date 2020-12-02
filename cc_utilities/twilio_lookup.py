@@ -11,7 +11,7 @@ from .constants import (
     COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME,
     COMMCARE_CAN_SMS_LABEL,
     COMMCARE_CANNOT_SMS_LABEL,
-    COMMCARE_CONTACT_PHONE_FIELD,
+    COMMCARE_PHONE_FIELD,
     COMMCARE_UNSET_CAN_SMS_LABEL,
     TWILIO_LOOKUP_URL,
     TWILIO_MOBILE_CODE,
@@ -26,10 +26,10 @@ class TwilioLookUpError(Exception):
         self.info = info
 
 
-def process_contacts(data, search_column, twilio_sid, twilio_token):
-    """Process a set of contacts' phone numbers to determine if can have SMS sent"""
+def process_records(data, search_column, twilio_sid, twilio_token):
+    """Process a set of records' phone numbers to determine if can have SMS sent"""
 
-    contacts = [
+    records = [
         dict(
             copy.deepcopy(item),  # vs fear of mutability...
             **{
@@ -39,31 +39,31 @@ def process_contacts(data, search_column, twilio_sid, twilio_token):
         )
         for item in data
     ]
-    for contact in contacts:
+    for record in records:
         try:
-            contact["standard_formatted_number"] = format_phone_number(
-                contact[COMMCARE_CONTACT_PHONE_FIELD]
+            record["standard_formatted_number"] = format_phone_number(
+                record[COMMCARE_PHONE_FIELD]
             )
         except NumberParseException:
             logger.warning(
-                f"The number `{contact[COMMCARE_CONTACT_PHONE_FIELD]}` for contact "
-                f"`{contact[search_column]}` cannot be parsed and will be marked as "
+                f"The number `{record[COMMCARE_PHONE_FIELD]}` for "
+                f"`{record[search_column]}` cannot be parsed and will be marked as "
                 f"unable to receive sms."
             )
-            contact[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] = COMMCARE_CANNOT_SMS_LABEL
-    for contact in contacts:
-        if contact["standard_formatted_number"] is not None:
-            contact[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] = process_phone_number(
-                contact[COMMCARE_CONTACT_PHONE_FIELD], twilio_sid, twilio_token,
+            record[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] = COMMCARE_CANNOT_SMS_LABEL
+    for record in records:
+        if record["standard_formatted_number"] is not None:
+            record[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] = process_phone_number(
+                record[COMMCARE_PHONE_FIELD], twilio_sid, twilio_token,
             )
 
-    return contacts
+    return records
 
 
-def cleanup_processed_contacts_with_numbers(processed):
+def cleanup_processed_records_with_numbers(processed):
     """Remove unneeded key/value pairs from processed results to prep for CommCare"""
     for item in processed:
-        item.pop(COMMCARE_CONTACT_PHONE_FIELD)
+        item.pop(COMMCARE_PHONE_FIELD)
         item.pop("standard_formatted_number")
     return processed
 
@@ -140,7 +140,7 @@ def process_phone_number(formatted_number, sid, auth_token):
     )
 
 
-def get_unprocessed_contact_phone_numbers(db_url, search_column="id"):
+def get_unprocessed_phone_numbers(db_url, table_name="contact", search_column="id"):
     """Get a list of contact phone numbers that haven't been verified for SMS
 
     Args:
@@ -153,35 +153,32 @@ def get_unprocessed_contact_phone_numbers(db_url, search_column="id"):
     """
     engine = create_engine(db_url)
     meta = MetaData(bind=engine)
-    contact = Table("contact", meta, autoload=True, autoload_with=engine)
-    assert COMMCARE_CONTACT_PHONE_FIELD in [
-        col.name for col in contact.columns
-    ], f"{COMMCARE_CONTACT_PHONE_FIELD} not in contacts table"
+    table = Table(table_name, meta, autoload=True, autoload_with=engine)
+    assert COMMCARE_PHONE_FIELD in [
+        col.name for col in table.columns
+    ], f"{COMMCARE_PHONE_FIELD} not in {table_name} table"
     # There is an edge case where COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME will not
-    # be in contact table columns even if it's in contact case type on CommCare,
+    # be in the table's columns even if it's in case type on CommCare,
     # if there are no cases for this property with non-null values. We need to
     # only filter our query by this column value if it exists...
     has_can_sms_column = COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME in [
-        col.name for col in contact.columns
+        col.name for col in table.columns
     ]
 
     wheres = [
-        getattr(contact.c, COMMCARE_CONTACT_PHONE_FIELD).isnot(None),
-        func.length(getattr(contact.c, COMMCARE_CONTACT_PHONE_FIELD)) > 0,
+        getattr(table.c, COMMCARE_PHONE_FIELD).isnot(None),
+        func.length(getattr(table.c, COMMCARE_PHONE_FIELD)) > 0,
     ]
     if has_can_sms_column:
         wheres.append(
             or_(
-                getattr(contact.c, COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME).is_(None),
-                getattr(contact.c, COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME)
+                getattr(table.c, COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME).is_(None),
+                getattr(table.c, COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME)
                 == COMMCARE_UNSET_CAN_SMS_LABEL,
             )
         )
     query = select(
-        [
-            getattr(contact.c, search_column),
-            getattr(contact.c, COMMCARE_CONTACT_PHONE_FIELD),
-        ]
+        [getattr(table.c, search_column), getattr(table.c, COMMCARE_PHONE_FIELD)]
     ).where(and_(*wheres))
     conn = engine.connect()
     try:

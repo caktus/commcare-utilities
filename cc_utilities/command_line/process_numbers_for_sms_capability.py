@@ -4,9 +4,9 @@ from math import ceil
 from cc_utilities.common import chunk_list, upload_data_to_commcare
 from cc_utilities.logger import logger
 from cc_utilities.twilio_lookup import (
-    cleanup_processed_contacts_with_numbers,
-    get_unprocessed_contact_phone_numbers,
-    process_contacts,
+    cleanup_processed_records_with_numbers,
+    get_unprocessed_phone_numbers,
+    process_records,
 )
 
 
@@ -17,6 +17,7 @@ def main_with_args(
     commcare_project_name,
     twilio_sid,
     twilio_token,
+    case_type,
     search_column,
     batch_size=100,
 ):
@@ -29,6 +30,8 @@ def main_with_args(
         commcare_project_name (str): The Commcare project being exported from
         twilio_sid (str): A Twilio SID
         twilio_token (str): A Twilio auth token
+        case_type (str): Case type and table name in db_url that should be queried
+            for cases with a missing SMS capability property
         search_column (str): : The name of the column in the db for contact that
             CommCare will match against in the bulk upload step. See
             https://confluence.dimagi.com/display/commcarepublic/Bulk+Upload+Case+Data
@@ -37,35 +40,35 @@ def main_with_args(
             results for that batch to CommCare, before moving on to next batch.
 
     """
-    unprocessed = get_unprocessed_contact_phone_numbers(db_url, search_column)
-    logger.info(f"{len(unprocessed)} unprocessed contacts found")
+    unprocessed = get_unprocessed_phone_numbers(db_url, case_type, search_column)
+    logger.info(f"{len(unprocessed)} unprocessed {case_type}(s) found")
     expected_batches = ceil(len(unprocessed) / batch_size)
     logger.info(
-        f"Processing contacts in {expected_batches} "
-        f"{'batch' if expected_batches == 1 else 'batches'} of {batch_size} contacts "
+        f"Processing {case_type}(s) in {expected_batches} "
+        f"{'batch' if expected_batches == 1 else 'batches'} of {batch_size} {case_type}(s) "
         f"per batch."
     )
     for i, subset in enumerate(chunk_list(unprocessed, batch_size)):
         batch_num = i + 1
         logger.info(
             f"Processing batch {batch_num} of {expected_batches} consisting of "
-            f"{len(subset)} contacts."
+            f"{len(subset)} {case_type}(s)."
         )
         try:
-            contacts_data = cleanup_processed_contacts_with_numbers(
-                process_contacts(subset, search_column, twilio_sid, twilio_token,)
+            contacts_data = cleanup_processed_records_with_numbers(
+                process_records(subset, search_column, twilio_sid, twilio_token,)
             )
         except Exception as exc:
             logger.error(f"Something unexpected happened: {exc.message}")
             raise exc
         logger.info(
-            f"Uploading SMS capability status for {len(contacts_data)} contacts from "
+            f"Uploading SMS capability status for {len(contacts_data)} {case_type}(s) from "
             f"batch {batch_num} of {expected_batches} to CommCare."
         )
         upload_data_to_commcare(
             contacts_data,
             commcare_project_name,
-            "contact",
+            case_type,
             search_column,
             commcare_user_name,
             commcare_api_key,
@@ -91,16 +94,15 @@ def main():
     parser.add_argument(
         "--project", help="The Commcare project name", dest="commcare_project_name"
     )
+    parser.add_argument("--twilio-sid", help="The SID of a Twilio account")
+    parser.add_argument("--twilio-token", help="Auth token for the Twilio account")
     parser.add_argument(
-        "--twilioSID", help="The SID of a Twilio account", dest="twilio_sid"
+        "--case-type",
+        help="The case type and table name in DB to update (e.g., 'contact' or 'patient')",
     )
     parser.add_argument(
-        "--twilioToken", help="Auth token for the Twilio account", dest="twilio_token"
-    )
-    parser.add_argument(
-        "--searchColumn",
+        "--search-column",
         help="The column in db that will be matched as ID against Commcare's ID",
-        dest="search_column",
         default="id",
     )
     args = parser.parse_args()
@@ -111,5 +113,6 @@ def main():
         args.commcare_project_name,
         args.twilio_sid,
         args.twilio_token,
+        args.case_type,
         args.search_column,
     )
