@@ -15,8 +15,7 @@ from cc_utilities.constants import (
     APPLICATION_STRUCTURE_DEFAULT_TIMEOUT,
     COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS,
 )
-from cc_utilities.logger import log_file as LOG_FILE
-from cc_utilities.logger import logger
+from cc_utilities.logger import get_full_log_file_path, logger
 
 PARENT_PROPERTY_PREFIX = "parent/"
 
@@ -64,8 +63,9 @@ def do_commcare_export_to_db(
         [i for i in (commands, additional_options, additional_flags) if i]
     ).strip()
     commands = commands.split(" ")
-    if LOG_FILE:
-        with open(LOG_FILE, "a") as fl:
+    log_file_path = get_full_log_file_path()
+    if log_file_path:
+        with open(log_file_path, "a") as fl:
             subprocess.run(commands, stderr=fl, stdout=fl)
     else:
         subprocess.run(commands)
