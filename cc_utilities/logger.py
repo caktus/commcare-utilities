@@ -7,7 +7,7 @@ from pathlib import Path
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 CONSOLE_LOGGER_LEVEL = "INFO"
-FILE_LOGGER_LEVEL = "WARNING"
+FILE_LOGGER_LEVEL = "INFO"
 
 console_logger = logging.StreamHandler(sys.stdout)
 console_logger.setLevel(logging.DEBUG)
@@ -18,6 +18,9 @@ logger = logging.getLogger("main")
 logger.setLevel(getattr(logging, CONSOLE_LOGGER_LEVEL))
 logger.addHandler(console_logger)
 log_file_path_from_env = os.environ.get("COMMCARE_UTILITIES_LOG_PATH")
+
+# need this to be importable elsewhere with default value of None
+log_file = None
 
 if log_file_path_from_env:
     log_file_path = Path(log_file_path_from_env)

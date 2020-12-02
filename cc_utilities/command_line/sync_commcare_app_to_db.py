@@ -15,6 +15,7 @@ from cc_utilities.constants import (
     APPLICATION_STRUCTURE_DEFAULT_TIMEOUT,
     COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS,
 )
+from cc_utilities.logger import log_file as LOG_FILE
 from cc_utilities.logger import logger
 
 PARENT_PROPERTY_PREFIX = "parent/"
@@ -63,7 +64,11 @@ def do_commcare_export_to_db(
         [i for i in (commands, additional_options, additional_flags) if i]
     ).strip()
     commands = commands.split(" ")
-    subprocess.run(commands)
+    if LOG_FILE:
+        with open(LOG_FILE, "a") as fl:
+            subprocess.run(commands, stderr=fl, stdout=fl)
+    else:
+        subprocess.run(commands)
 
 
 def normalize_application_structure_response_data(response_json):
