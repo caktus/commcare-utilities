@@ -26,6 +26,6 @@ sync-commcare-app-to-db.exe `
 	--project $env:CC_PROJECT_NAME `
 	--app-id $env:CC_APP_ID `
 	--db-url $env:CC_DB_URL `
-	--app-structure-json-save-folder-path $env:CC_APP_STRUCTURE_FOLDER_PATH
+	--app-structure-json-save-folder-path $env:CC_APP_STRUCTURE_FOLDER_PATH `
 	--since $script:SinceDateString
 exit
