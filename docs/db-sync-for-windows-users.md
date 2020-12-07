@@ -44,21 +44,22 @@ Note that this guide does not cover all possible configurations on Windows or th
     At this point,  you can close the command line terminal you've been working in so far, as we'll be setting up environment variables, and will need to start a new terminal in order to pick up the new environment variables.
 
 6. **Create your database and db user**: Follow relevant instructions for your database server to create a new database which will hold your CommCare data and to create a database user that will remotely access the database when the script runs. ***Note that if you're running SQL Server, you'll need to enable remote access to the db. That means enabling rthe "Allow remote connections" option as well as enabling TCP/IP connections***.
-7. **Set up environment variables**: Now you'll need to set up environment variables that you'll reference when running the script from your command line environment. Open `Control Panel` -> `System Properties` and then click the `Environment Variables` button. Now, you'll set up the following environment variables as user variables:
+7. **Create an assets folder**: The script needs to save data files based on API responses, and in the next step, you'll need to set an environment variable to point to a folder where you want to store those assets. If you want to use a pre-existing folder, you can skip this step, but if you want to use a new folder, create it now. For instance, if you've stored `commcare-utilities` to your Documents folder, you might set this value to: `C:\Users\<username>\Documents\commcare-utilities\assets`, after **creating a folder called `assets` in the `commcare-utilities` folder**.
+8. **Set up environment variables**: Now you'll need to set up environment variables that you'll reference when running the script from your command line environment. Open `Control Panel` -> `System Properties` and then click the `Environment Variables` button. Now, you'll set up the following environment variables as user variables:
 
    - `CC_API_KEY`: You will need to set up an API key in your CommCare dashboard, [as explained here](https://confluence.dimagi.com/display/commcarepublic/Authentication#Authentication-ApiKeyauthentication). Note that CommCare API keys can be whitelisted to a specific IP address. If the IP address of the computer this script will be running on is static, we recommend whitelisting it. Copy your API key from CommCare and save it as the value for `CC_API_KEY`.
    - `CC_APP_ID`: This value can be retreived by logging into your CommCareHQ dashboard, selecting your application from the `Applications` dropdown, then extracting it from the URL of the resulting page. The URL will look like this: `https://www.commcarehq.org/a/<project-name>/apps/view/<this-is-your-app-id>/`.
    - `CC_DB_URL`: This value is a connection string encompassing the database host, name, port, username, password, and driver. For SQL Server, your database url will look something like this: `mssql+pyodbc://<db-user-name>:<db-password>@<db-host-name>:<db-port>/<db-name>?driver=SQL+Server`
    - `CC_PROJECT_NAME`: You can find this value in your CommCare dashboard by clicking on Dashboard. This will take you to a page with a URL that looks like this: `https://www.commcarehq.org/a/<project-name>/dasbhoard/project`. Set `CC_PROJECT_NAME` to the value you find for `<project-name>`.
    - `CC_USER_NAME`: This will be the email address that you use to log in to the CommCare account that you used to create the API key. **NOTE** this account will also need to have the `System Admin (API)` user role in order for the script to work.
-   - `CC_APP_STRUCTURE_FOLDER_PATH`: The database sync script saves a JSON file representing the structure of your CommCare instance (in terms of case types and their field names). Set this value to a folder where you'd like to store this JSON file. For instance, if you've stored `commcare-utilities` to your Documents folder, you might set this value to: `C:\Users\<username>\Documents\commcare-utilities\assets`, after creating a folder called `assets` in the `commcare-utilities` folder.
+   - `CC_APP_STRUCTURE_FOLDER_PATH`: The database sync script saves a JSON file representing the structure of your CommCare instance (in terms of case types and their field names). Set this value to the path of the assets folder you created in the previous step.
    - `CC_APP_STRUCTURE_FILE_PATH`: This is the full path to the JSON file that will store the application structure data. This file doesn't exist yet, but the script will use a predictable file name for it, so we can set it now. Set this value to `%CC_APP_STRUCTURE_FOLDER_PATH%\app_structure_latest.json`.
    - `CC_REPO_PATH`: The path to the folder of the `commcare-utilities` repo.
 
     That's it for setting environment variables. Click "OK" to save these changes.
 
-8. **Open a new command line terminal**: We'll need a new terminal for the new environment variables to take effect. In your new terminal, you can confirm they've been set by running `echo $env:CC_USER_NAME` (Powershell) or `echo %CC_USER_NAME%` (Command Prompt). Now navigate back into the `commcare-utilities` folder and activate your virtual environment.
-9. **Run the script**: Now we'll run the script for the first time. Run the following command:
+9. **Open a new command line terminal**: We'll need a new terminal for the new environment variables to take effect. In your new terminal, you can confirm they've been set by running `echo $env:CC_USER_NAME` (Powershell) or `echo %CC_USER_NAME%` (Command Prompt). Now navigate back into the `commcare-utilities` folder and activate your virtual environment.
+10. **Run the script**: Now we'll run the script for the first time. Run the following command:
 
     ```bash
     # Powershell...
@@ -69,8 +70,8 @@ Note that this guide does not cover all possible configurations on Windows or th
     ```
 
     This script will likely take several minutes to run. It will output logs as it adds tables and columns to the database.
-10. **Confirm your data in your db**: You can confirm that data synced by connecting to your DB using the client of your choice and verifying that new tables have been created and that rows are found.
-11. **Re-run the script with the app structure file**: Finally, try re-running the script, but point it to the `app_structure_latest.json` file to avoid the API call to CommCare. This will cause the script to run considerably faster. From the same terminal you were previously working in, run:
+11. **Confirm your data in your db**: You can confirm that data synced by connecting to your DB using the client of your choice and verifying that new tables have been created and that rows are found.
+12. **Re-run the script with the app structure file**: Finally, try re-running the script, but point it to the `app_structure_latest.json` file to avoid the API call to CommCare. This will cause the script to run considerably faster. From the same terminal you were previously working in, run:
 
     ```bash
     sync-commcare-app-to-db.exe --username $env:CC_USER_NAME --api-key $env:CC_API_KEY --project $env:CC_PROJECT_NAME --app-id $env:CC_APP_ID --db-url $env:CC_DB_URL --existing-app-structure-json $env:CC_APP_STRUCTURE_FILE_PATH
