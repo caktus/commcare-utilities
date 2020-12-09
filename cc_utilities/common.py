@@ -156,6 +156,10 @@ def upload_data_to_commcare(
         "Authorization": f"ApiKey {cc_username}:{cc_api_key}",
     }
     adapter = HTTPAdapter(max_retries=retry_strategy)
+    session = requests.Session()
+    session.headers.update(headers)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
     url = BULK_UPLOAD_URL.format(project_slug)
     if not isinstance(df, pd.DataFrame):
         df = pd.DataFrame(df)
@@ -176,13 +180,9 @@ def upload_data_to_commcare(
         search_field=search_field,
         create_new_cases=create_new_cases,
     )
-    with requests.Session() as session:
-        session.headers.update(headers)
-        session.mount("https://", adapter)
-        session.mount("http://", adapter)
-        req = requests.Request("POST", url, data=body, files=files)
-        prepped = session.prepare_request(req)
-        response = session.send(prepped, timeout=request_timeout)
+    req = requests.Request("POST", url, data=body, files=files)
+    prepped = session.prepare_request(req)
+    response = session.send(prepped, timeout=request_timeout)
 
     if not response.ok:
         message = (
@@ -200,7 +200,7 @@ def upload_data_to_commcare(
         seconds = 2
         logger.info(f"Sleeping {seconds} seconds and checking upload status...")
         time.sleep(seconds)
-        response_ = requests.get(
+        response_ = session.get(
             response.json()["status_url"], headers=headers, timeout=request_timeout
         )
 
