@@ -1,8 +1,8 @@
 import uuid
 
-import requests
 from faker import Faker
 
+from cc_utilities import twilio_lookup
 from cc_utilities.constants import (
     COMMCARE_CAN_SMS_LABEL,
     COMMCARE_CANNOT_SMS_LABEL,
@@ -86,7 +86,7 @@ class TestBulkProcessNumbersCanReceiveSms:
         def mock_get(*args, **kwargs):
             return MockTwilioPhoneTypeMobileResponse()
 
-        monkeypatch.setattr(requests, "get", mock_get)
+        monkeypatch.setattr(twilio_lookup, "twilio_http_request", mock_get)
         search_column = "id"
         twilio_sid = twilio_token = "xxxxxx"
         fake = Faker("en_US")
@@ -104,7 +104,7 @@ class TestBulkProcessNumbersCanReceiveSms:
         def mock_get(*args, **kwargs):
             return MockTwilioPhoneTypeVoipResponse()
 
-        monkeypatch.setattr(requests, "get", mock_get)
+        monkeypatch.setattr(twilio_lookup, "twilio_http_request", mock_get)
         search_column = "id"
         twilio_sid = twilio_token = "xxxxxx"
         fake = Faker("en_US")
@@ -124,7 +124,7 @@ class TestBulkProcessNumbersCanReceiveSms:
         def mock_get(*args, **kwargs):
             return MockTwilioPhoneTypeLandlineResponse()
 
-        monkeypatch.setattr(requests, "get", mock_get)
+        monkeypatch.setattr(twilio_lookup, "twilio_http_request", mock_get)
         search_column = "id"
         twilio_sid = twilio_token = "xxxxxx"
         fake = Faker("en_US")
@@ -148,7 +148,7 @@ class TestBulkProcessNumbersCanReceiveSms:
         def mock_get(*args, **kwargs):
             return MockTwilioPhoneNumberNonUsRegion()
 
-        monkeypatch.setattr(requests, "get", mock_get)
+        monkeypatch.setattr(twilio_lookup, "twilio_http_request", mock_get)
         search_column = "id"
         twilio_sid = twilio_token = "xxxxxx"
         fake = Faker("en_CA")
