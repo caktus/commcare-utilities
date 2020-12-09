@@ -200,9 +200,7 @@ def upload_data_to_commcare(
         seconds = 2
         logger.info(f"Sleeping {seconds} seconds and checking upload status...")
         time.sleep(seconds)
-        response_ = session.get(
-            response.json()["status_url"], headers=headers, timeout=request_timeout
-        )
+        response_ = session.get(response.json()["status_url"])
 
         if response_.json()["state"] == COMMCARE_UPLOAD_STATES["failed"]:
             msg = (
