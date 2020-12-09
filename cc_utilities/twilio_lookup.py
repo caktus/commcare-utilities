@@ -3,6 +3,8 @@ import copy
 import phonenumbers
 import requests
 from phonenumbers import NumberParseException
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 from sqlalchemy import MetaData, Table, create_engine
 from sqlalchemy.sql import and_, or_, select
 from sqlalchemy.sql.expression import func
@@ -82,6 +84,26 @@ def format_phone_number(raw, region="US"):
     return f"+{parsed.country_code}{parsed.national_number}"
 
 
+def twilio_http_request(method, url, sid, auth_token):
+    """
+    Issue an HTTP request to Twilio with a retry strategy.
+    """
+    retry_strategy = Retry(
+        total=5,
+        backoff_factor=6,
+        # 429 = "Too Many Requests"
+        # https://support.twilio.com/hc/en-us/articles/360044308153-Twilio-API-response-Error-429-Too-Many-Requests-
+        status_forcelist=[429],
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    with requests.Session() as session:
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        return session.request(
+            method, url, auth=(sid, auth_token), params={"Type": "carrier"},
+        )
+
+
 def twilio_lookup_phone_number_type(formatted_number, sid, auth_token):
     """Determine phone number carrier type for a formatted number
 
@@ -95,10 +117,8 @@ def twilio_lookup_phone_number_type(formatted_number, sid, auth_token):
         str indicating carrier type if number can be looked up, else 'unknown'
         if number can't be looked up.
     """
-    response = requests.get(
-        f"{TWILIO_LOOKUP_URL}/{formatted_number}",
-        auth=(sid, auth_token),
-        params={"Type": "carrier"},
+    response = twilio_http_request(
+        "GET", f"{TWILIO_LOOKUP_URL}/{formatted_number}", sid, auth_token
     )
     if response.ok:
         return response.json()["carrier"]["type"]
