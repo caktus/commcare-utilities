@@ -458,7 +458,7 @@ def test_command_line_script_happy_path(
                 )
             )
         )
-        validation_df = pd.read_excel(validation_report_path)
+        validation_df = pd.read_excel(validation_report_path, engine="openpyxl")
         assert set(("is_valid", "validation_problems")).issubset(
             set(validation_df.columns)
         )
@@ -469,7 +469,7 @@ def test_command_line_script_happy_path(
                 str(PurePath(report_dir).joinpath(f"*{FINAL_REPORT_FILE_NAME_PART}*"))
             )
         )
-        final_report_df = pd.read_excel(final_report_path)
+        final_report_df = pd.read_excel(final_report_path, engine="openpyxl")
         assert set(("contact_creation_success", "commcare_contact_case_url")).issubset(
             set(final_report_df.columns)
         )
