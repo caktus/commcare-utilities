@@ -366,6 +366,7 @@ def extract_options_and_flags_to_pass_to_commcare_export(args):
     commcare_export_script_options = {
         "since": args.since,
         "until": args.until,
+        "batch-size": args.batch_size,
     }
     # get rid items that are not set and are therefore `None`
     commcare_export_script_options = {
@@ -432,8 +433,8 @@ def main():
     parser.add_argument(
         "--batch-size",
         help=(
-            "Optional. Integer. If included, records will be streamed to the SQL "
-            "db in batches of this size"
+            "Integer. Records will be streamed to the SQL "
+            "db in batches of this size. Defaults to 1000."
         ),
         default=5000,
     )
