@@ -2,17 +2,15 @@ name: package dependencies
 
 on:
   push:
-    branches:
-      - main
-      - package-release
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
 jobs:
   # Split release/upload workflow adapted from:
   # https://github.com/actions/create-release/issues/14#issuecomment-555379810
   release:
     name: Create GitHub Release
-    # TODO: Possibly only publish tagged releases
-    # if: contains(github.ref, 'tags/v')
     runs-on: ubuntu-latest
     steps:
     - name: Create Release
@@ -34,8 +32,7 @@ jobs:
         name: release_url
         path: release_url.txt
   package-deps:
-    # TODO: Possibly only publish tagged releases
-    # if: contains(github.ref, 'tags/v')
+    name: Package and upload dependencies
     needs: [release]
     strategy:
       matrix:
@@ -59,12 +56,14 @@ jobs:
           cd ${{ matrix.os }}-deps/
           pip freeze | grep -v commcare-utilities > requirements.txt
           pip download -r requirements.txt
-          cd ..
+      - name: Zip dependencies
+        if: '!contains(matrix.os, "windows")'
+        run: |
           zip -r ${{ matrix.os }}-deps.zip ${{ matrix.os }}-deps/
-      - uses: actions/upload-artifact@v2
-        with:
-          name: commcare-utilities-${{ matrix.os }}-deps
-          path: ${{ matrix.os }}-deps/
+      - name: Zip dependencies
+        if: 'contains(matrix.os, "windows")'
+        run: |
+          powershell Compress-Archive ${{ matrix.os }}-deps/ ${{ matrix.os }}-deps.zip
       - name: Load Release URL File from release job
         uses: actions/download-artifact@v1
         with:
