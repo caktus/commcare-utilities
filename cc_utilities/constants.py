@@ -33,6 +33,7 @@ COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS = {
     ("id", "id"),
     ("indexed_on", "indexed_on"),
     ("opened_by", "opened_by"),
+    ("indices.parent.case_id", "parent_case_id"),
     ("properties.case_type", "case_type"),
     ("properties.closed_by", "closed_by"),
     ("properties.closed_on", "closed_on"),
