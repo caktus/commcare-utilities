@@ -12,6 +12,7 @@ from faker import Faker
 from cc_utilities.command_line.bulk_upload_legacy_contact_data import (
     FINAL_REPORT_FILE_NAME_PART,
     VALIDATION_REPORT_FILE_NAME_PART,
+    convert_xl_wb_to_csv_string_io,
     main_with_args,
 )
 from cc_utilities.legacy_upload import (
@@ -458,7 +459,13 @@ def test_command_line_script_happy_path(
                 )
             )
         )
-        validation_df = pd.read_excel(validation_report_path, engine="openpyxl")
+        # do this because we can't simply use `.read_excel` because of a dependency
+        # conflict on openpyxl between commcare-export and Pandas (which will accept
+        # openpyxl required by commcare-export, but will fail).
+        # `convert_xl_wb_to_csv_string` already exists for other reasons, and using here
+        # as work around on dependency conflict.
+        validation_csv = convert_xl_wb_to_csv_string_io(validation_report_path)
+        validation_df = pd.read_csv(validation_csv)
         assert set(("is_valid", "validation_problems")).issubset(
             set(validation_df.columns)
         )
@@ -469,7 +476,13 @@ def test_command_line_script_happy_path(
                 str(PurePath(report_dir).joinpath(f"*{FINAL_REPORT_FILE_NAME_PART}*"))
             )
         )
-        final_report_df = pd.read_excel(final_report_path, engine="openpyxl")
+        # do this because we can't simply use `.read_excel` because of a dependency
+        # conflict on openpyxl between commcare-export and Pandas (which will accept
+        # openpyxl required by commcare-export, but will fail).
+        # `convert_xl_wb_to_csv_string` already exists for other reasons, and using here
+        # as work around on dependency conflict.
+        final_report_csv = convert_xl_wb_to_csv_string_io(final_report_path)
+        final_report_df = pd.read_csv(final_report_csv)
         assert set(("contact_creation_success", "commcare_contact_case_url")).issubset(
             set(final_report_df.columns)
         )
