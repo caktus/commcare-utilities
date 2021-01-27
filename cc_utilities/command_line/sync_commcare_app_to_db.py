@@ -375,7 +375,7 @@ def extract_options_and_flags_to_pass_to_commcare_export(args):
     commcare_export_script_flags = []
     # these ones are optional flags that don't have a value.
     # we check to see if they are included when script is called
-    for arg in ["verbose", "users", "locations", "with_organization"]:
+    for arg in ["verbose", "users", "locations", "with_organization", "start_over"]:
         if args.__dict__[arg]:
             commcare_export_script_flags.append(arg.replace("_", "-"))
     return commcare_export_script_options, commcare_export_script_flags
@@ -459,6 +459,14 @@ def main():
             "If flag included, export tables containing mobile worker data and "
             "location data and add a commcare_userid field to any exported form or "
             "case"
+        ),
+        action="store_true",
+    )
+    parser.add_argument(
+        "--start-over",
+        help=(
+            "When saving to a SQL database; the default is to pick up since the last "
+            "success. This disables that."
         ),
         action="store_true",
     )
