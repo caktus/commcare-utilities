@@ -757,7 +757,7 @@ def generate_commcare_contact_data(valid_normalized_data, patient_id, **kwargs):
 
     return {
         **COMMCARE_DEFAULT_CONTACT_KEY_VALUES,
-        **{"patient_id": patient_id},
+        **{"parent_id": patient_id},
         **valid_normalized_data,
         **kwargs,
     }
