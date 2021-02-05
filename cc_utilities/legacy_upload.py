@@ -212,6 +212,7 @@ def generate_cc_dummy_patient_cases(
     """
     external_ids = [generate_commcare_external_id() for i in range(num_dummies)]
     dummies_data = [create_dummy_patient_case_data(ext_id) for ext_id in external_ids]
+    logger.info("Doing initial upload of dummy patient")
     upload_data_to_commcare(
         dummies_data, project_slug, "patient", "case_id", cc_user_name, cc_api_key
     )
@@ -221,6 +222,7 @@ def generate_cc_dummy_patient_cases(
     close_data = [
         dict(external_id=item["external_id"], close="yes") for item in dummies_data
     ]
+    logger.info("Doing update of dummy patient to close the case")
     upload_data_to_commcare(
         close_data,
         project_slug,

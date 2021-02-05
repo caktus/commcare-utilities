@@ -1,12 +1,16 @@
+import http.client
 import logging
 import os
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+http.client.HTTPConnection.debuglevel = 1
+
+
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-CONSOLE_LOGGER_LEVEL = "INFO"
+CONSOLE_LOGGER_LEVEL = "DEBUG"
 FILE_LOGGER_LEVEL = "INFO"
 
 console_logger = logging.StreamHandler(sys.stdout)
@@ -17,6 +21,10 @@ console_logger.setFormatter(formatter)
 logger = logging.getLogger("main")
 logger.setLevel(getattr(logging, CONSOLE_LOGGER_LEVEL))
 logger.addHandler(console_logger)
+
+requests_log = logging.getLogger("requests.packages.urllib3")
+requests_log.setLevel(logging.DEBUG)
+requests_log.propagate = True
 
 
 def get_full_log_file_path():
