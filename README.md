@@ -38,6 +38,17 @@ To run tests, from root of repo, do:
 tox
 ```
 
+## Releases
+
+This repo contains a workflow to auto-publish releases, with OS-specific dependencies packaged, when a tag is pushed. So, to create a release, simply create and push a new tag:
+
+```bash
+git tag v1.0
+git push origin v1.0
+```
+
+Once the tag is pushed, it'll take a few minutes for the dependencies to be packaged and uploaded as additional release assets. You can watch the "Actions" tab for the project in GitHub for updates.
+
 ## Scripts
 
 ### `sync-commcare-app-to-db`
