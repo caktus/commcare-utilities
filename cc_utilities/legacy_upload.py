@@ -193,6 +193,7 @@ def create_dummy_patient_case_data(external_id):
         "stub": "yes",
         "name": "(no index case)",
         "stub_type": "contact_without_index",
+        "current_status": "closed",
     }
 
 
@@ -214,22 +215,6 @@ def generate_cc_dummy_patient_cases(
     dummies_data = [create_dummy_patient_case_data(ext_id) for ext_id in external_ids]
     upload_data_to_commcare(
         dummies_data, project_slug, "patient", "case_id", cc_user_name, cc_api_key
-    )
-    # Because of an oddity of the CommCare API, even if cases are created with
-    # `close: "yes"`, the cases will appear as open in the case list dashboard.
-    # We therefore send `close_data` below to close them
-    close_data = [
-        dict(external_id=item["external_id"], close="yes") for item in dummies_data
-    ]
-    upload_data_to_commcare(
-        close_data,
-        project_slug,
-        "patient",
-        "external_id",
-        cc_user_name,
-        cc_api_key,
-        search_field="external_id",
-        create_new_cases="off",
     )
     # retrieve the dummies by contact id so we can get their case_ids, which we
     # will attach to contacts we later upload
