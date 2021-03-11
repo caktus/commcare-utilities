@@ -216,6 +216,8 @@ def generate_cc_dummy_patient_cases(
     upload_data_to_commcare(
         dummies_data, project_slug, "patient", "case_id", cc_user_name, cc_api_key
     )
+    # retrieve the dummies by contact id so we can get their case_ids, which we
+    # will attach to contacts we later upload
     cc_dummy_patients = []
     for ext_id in external_ids:
         cc_dummy_patients.extend(
