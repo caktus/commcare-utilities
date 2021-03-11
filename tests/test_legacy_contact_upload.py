@@ -115,6 +115,7 @@ def test_create_dummy_patient_case_data():
         "stub": "yes",
         "name": "(no index case)",
         "stub_type": "contact_without_index",
+        "current_status": "closed",
     }
     actual = create_dummy_patient_case_data(external_id)
     assert set(expectations.keys()) == set(actual.keys())
