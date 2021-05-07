@@ -25,6 +25,14 @@ This repo is for an assortment of scripts for developers working with Commcare.
 
 ## Setup
 
+#### System pre-requisites
+
+- Python 3.7 (and libpython3.7-dev for linux)
+- unixodbc-dev
+- tox
+
+#### Steps
+
 1. Create and source a virtual environment.
 2. `pip3 install -e .`
 3. Check if there are additional dependencies required for any of the scripts you wish to run (see below), and install them.
