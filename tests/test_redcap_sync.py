@@ -7,6 +7,7 @@ import pytest
 from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     normalize_phone_cols,
+    set_external_id_column,
     split_cases_and_contacts,
     upload_complete_records,
     upload_incomplete_records,
@@ -120,6 +121,30 @@ def test_upload_incomplete_records(mock_upload_to_commcare):
     pd.testing.assert_frame_equal(
         mock_upload_to_commcare.call_args_list[1][0][0], expected_incomplete_records[1]
     )
+
+
+def test_set_external_id_column():
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3", "4"],
+            "cdms_id": ["1111", None, "3333", None],
+            "arbitrary": ["some", "arbitrary", None, np.NAN],
+            "stuff": ["some", "more", "values", "test"],
+        },
+        index=[1, 2, 3, 4],
+    )
+    expected_output_df = pd.DataFrame(
+        {
+            "record_id": ["1", "3"],
+            "cdms_id": ["1111", "3333"],
+            "arbitrary": ["some", None],
+            "stuff": ["some", "values"],
+            "external_id": ["1111", "3333"],
+        },
+        index=[1, 3],
+    )
+    output = set_external_id_column(input_df, external_id_col="cdms_id")
+    pd.testing.assert_frame_equal(expected_output_df, output)
 
 
 @pytest.mark.skip(

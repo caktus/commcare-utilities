@@ -9,6 +9,7 @@ from cc_utilities.logger import logger
 from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     normalize_phone_cols,
+    set_external_id_column,
     upload_complete_records,
     upload_incomplete_records,
 )
@@ -99,11 +100,11 @@ def main_with_args(
         if len(redcap_records.index) == 0:
             logger.info("No records returned from REDCap; aborting sync.")
         else:
-            cases_df = redcap_records.pipe(collapse_checkbox_columns).pipe(
-                normalize_phone_cols, phone_cols
+            cases_df = (
+                redcap_records.pipe(collapse_checkbox_columns)
+                .pipe(normalize_phone_cols, phone_cols)
+                .pipe(set_external_id_column, external_id_col)
             )
-            cases_df.dropna(subset=[external_id_col], inplace=True)
-            cases_df["external_id"] = cases_df[external_id_col]
             logger.info(
                 f"Uploading {len(cases_df.index)} found patients (cases) to CommCare..."
             )

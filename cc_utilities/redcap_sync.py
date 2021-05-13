@@ -81,6 +81,15 @@ def normalize_phone_cols(df, phone_cols):
     return df
 
 
+def set_external_id_column(df, external_id_col):
+    """
+    For the given external_id_col, copy to a new column named "external_id"
+    """
+    df.dropna(subset=[external_id_col], inplace=True)
+    df["external_id"] = df[external_id_col]
+    return df
+
+
 def split_cases_and_contacts(df, external_id_col):
     """
     FIXME - this is unused and will need updating (the expected columns
@@ -135,16 +144,17 @@ def upload_complete_records(
 ):
     """Drops all rows with any missing values and uploads the remainder to CommCare."""
     complete_records = cases_df.dropna()
-    upload_data_to_commcare(
-        complete_records,
-        commcare_project_name,
-        "patient",
-        "external_id",
-        commcare_user_name,
-        commcare_api_key,
-        create_new_cases="on",
-        search_field="external_id",
-    )
+    if len(complete_records.index) > 0:
+        upload_data_to_commcare(
+            complete_records,
+            commcare_project_name,
+            "patient",
+            "external_id",
+            commcare_user_name,
+            commcare_api_key,
+            create_new_cases="off",
+            search_field="external_id",
+        )
 
 
 def upload_incomplete_records(
@@ -167,6 +177,6 @@ def upload_incomplete_records(
             "external_id",
             commcare_user_name,
             commcare_api_key,
-            create_new_cases="on",
+            create_new_cases="off",
             search_field="external_id",
         )
