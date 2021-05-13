@@ -5,12 +5,12 @@ from datetime import datetime
 import redcap
 import yaml
 
-from cc_utilities.common import upload_data_to_commcare
 from cc_utilities.logger import logger
 from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     normalize_phone_cols,
-    split_cases_and_contacts,
+    upload_complete_records,
+    upload_incomplete_records,
 )
 
 
@@ -99,30 +99,20 @@ def main_with_args(
         if len(redcap_records.index) == 0:
             logger.info("No records returned from REDCap; aborting sync.")
         else:
-            cases_df, contacts_df = (
-                redcap_records.pipe(collapse_checkbox_columns)
-                .pipe(normalize_phone_cols, phone_cols)
-                .pipe(split_cases_and_contacts, external_id_col)
+            cases_df = redcap_records.pipe(collapse_checkbox_columns).pipe(
+                normalize_phone_cols, phone_cols
             )
+            cases_df.dropna(subset=[external_id_col], inplace=True)
+            cases_df["external_id"] = cases_df[external_id_col]
             logger.info(
                 f"Uploading {len(cases_df.index)} found patients (cases) to CommCare..."
             )
-            upload_data_to_commcare(
-                cases_df,
-                commcare_project_name,
-                "patient",
-                "external_id",
-                commcare_user_name,
-                commcare_api_key,
-                create_new_cases="off",
-                search_field="external_id",
+            upload_complete_records(
+                cases_df, commcare_api_key, commcare_project_name, commcare_user_name
             )
-            if len(contacts_df.index) > 0:
-                # FIXME: The contact columns don't appear to match directly to CommCare, and
-                # will need to be renamed before being imported.
-                logger.warning(
-                    f"Found {len(contacts_df.index)} contacts, but contact sync not implemented."
-                )
+            upload_incomplete_records(
+                cases_df, commcare_api_key, commcare_project_name, commcare_user_name
+            )
         state["date_begin"] = next_date_begin
     finally:
         # Whatever happens, don't keep our lock open.

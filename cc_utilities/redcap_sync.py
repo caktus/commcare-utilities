@@ -3,6 +3,7 @@ from functools import partial
 
 import pandas as pd
 
+from .common import upload_data_to_commcare
 from .legacy_upload import normalize_phone_number
 from .logger import logger
 
@@ -82,6 +83,8 @@ def normalize_phone_cols(df, phone_cols):
 
 def split_cases_and_contacts(df, external_id_col):
     """
+    FIXME - this is unused and will need updating (the expected columns
+     redcap_repeat_instrument and redcap_repeat_instance don't exist).
     Splits a single dataframe of cases and contacts in two, based on the values in the
     "redcap_repeat_instrument" column, and assigns the columns necessary for import
     to CommCare. `external_id_col` is the name of the REDCap column that should be assigned
@@ -125,3 +128,45 @@ def split_cases_and_contacts(df, external_id_col):
             columns=["redcap_repeat_instrument", "redcap_repeat_instance"]
         )
     return cases_df, contacts_df
+
+
+def upload_complete_records(
+    cases_df, commcare_api_key, commcare_project_name, commcare_user_name
+):
+    """Drops all rows with any missing values and uploads the remainder to CommCare."""
+    complete_records = cases_df.dropna()
+    upload_data_to_commcare(
+        complete_records,
+        commcare_project_name,
+        "patient",
+        "external_id",
+        commcare_user_name,
+        commcare_api_key,
+        create_new_cases="on",
+        search_field="external_id",
+    )
+
+
+def upload_incomplete_records(
+    cases_df, commcare_api_key, commcare_project_name, commcare_user_name
+):
+    """
+    To avoid overwriting existing data in CommCare with blank values,
+    iterate over the incomplete records one by one, drop any blank/null values
+    before uploading to CommCare.
+    """
+    incomplete_records = cases_df[cases_df.isna().any(axis=1)]
+    for index, row in incomplete_records.iterrows():
+        # Drops any values in this Series with missing/NA values,
+        # and converts it back to a DataFrame.
+        data = row.dropna().to_frame().transpose()
+        upload_data_to_commcare(
+            data,
+            commcare_project_name,
+            "patient",
+            "external_id",
+            commcare_user_name,
+            commcare_api_key,
+            create_new_cases="on",
+            search_field="external_id",
+        )

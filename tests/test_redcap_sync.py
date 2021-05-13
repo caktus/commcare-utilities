@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -6,6 +8,8 @@ from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     normalize_phone_cols,
     split_cases_and_contacts,
+    upload_complete_records,
+    upload_incomplete_records,
 )
 
 
@@ -49,6 +53,78 @@ def test_normalize_phone_cols():
     pd.testing.assert_frame_equal(expected_output_df, output_df)
 
 
+@patch("cc_utilities.redcap_sync.upload_data_to_commcare")
+def test_upload_complete_records(mock_upload_to_commcare):
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3", "4"],
+            "cdms_id": ["1111", "2222", "3333", "4444"],
+            "arbitrary": ["some", "arbitrary", None, np.NAN],
+            "stuff": ["some", "more", "values", "test"],
+            "external_id": ["1111", "2222", "3333", "4444"],
+        },
+        index=[1, 2, 3, 4],
+    )
+    expected_complete_records = pd.DataFrame(
+        {
+            "record_id": ["1", "2"],
+            "cdms_id": ["1111", "2222"],
+            "arbitrary": ["some", "arbitrary"],
+            "stuff": ["some", "more"],
+            "external_id": ["1111", "2222"],
+        },
+        index=[1, 2],
+    )
+    upload_complete_records(input_df, "api-key", "project-name", "username")
+    uploaded_dataframe = mock_upload_to_commcare.call_args[0][0]
+    pd.testing.assert_frame_equal(uploaded_dataframe, expected_complete_records)
+
+
+@patch("cc_utilities.redcap_sync.upload_data_to_commcare")
+def test_upload_incomplete_records(mock_upload_to_commcare):
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3", "4"],
+            "cdms_id": ["1111", "2222", "3333", "4444"],
+            "arbitrary": ["some", "arbitrary", None, np.NAN],
+            "stuff": ["some", "more", "values", "test"],
+            "external_id": ["1111", "2222", "3333", "4444"],
+        },
+        index=[1, 2, 3, 4],
+    )
+    expected_incomplete_records = [
+        pd.DataFrame(
+            {
+                "record_id": ["3"],
+                "cdms_id": ["3333"],
+                "stuff": ["values"],
+                "external_id": ["3333"],
+            },
+            index=[3],
+        ),
+        pd.DataFrame(
+            {
+                "record_id": ["4"],
+                "cdms_id": ["4444"],
+                "stuff": ["test"],
+                "external_id": ["4444"],
+            },
+            index=[4],
+        ),
+    ]
+    upload_incomplete_records(input_df, "api-key", "project-name", "username")
+    assert mock_upload_to_commcare.call_count == 2
+    pd.testing.assert_frame_equal(
+        mock_upload_to_commcare.call_args_list[0][0][0], expected_incomplete_records[0]
+    )
+    pd.testing.assert_frame_equal(
+        mock_upload_to_commcare.call_args_list[1][0][0], expected_incomplete_records[1]
+    )
+
+
+@pytest.mark.skip(
+    reason="split_cases_and_contacts is unused and relies on old/outdated data"
+)
 def test_split_cases_and_contacts():
     input_df = pd.DataFrame(
         {
@@ -98,11 +174,17 @@ def test_split_cases_and_contacts():
     pd.testing.assert_frame_equal(expected_output_contacts_df, contacts_output_df)
 
 
+@pytest.mark.skip(
+    reason="split_cases_and_contacts is unused and relies on old/outdated data"
+)
 def test_split_cases_and_contacts_no_cdms_id():
     with pytest.raises(ValueError):
         split_cases_and_contacts(pd.DataFrame({}), external_id_col="cdms_id")
 
 
+@pytest.mark.skip(
+    reason="split_cases_and_contacts is unused and relies on old/outdated data"
+)
 def test_split_cases_and_contacts_no_contacts():
     input_df = pd.DataFrame(
         {
