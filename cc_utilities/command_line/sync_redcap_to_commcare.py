@@ -140,7 +140,7 @@ def main():
         required=True,
     )
     parser.add_argument(
-        "--apikey", help="A Commcare API key", dest="commcare_api_key", required=True,
+        "--api-key", help="A Commcare API key", dest="commcare_api_key", required=True,
     )
     parser.add_argument(
         "--project",
