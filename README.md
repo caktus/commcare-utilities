@@ -41,14 +41,14 @@ This repo is for an assortment of scripts for developers working with Commcare.
 #### Pre Commit
 
 This repository uses [pre-commit](https://pre-commit.com) in order to run lint
-checks and tests on every commit. In order to install ``pre-commit`` and set it
+checks and tests on every commit. In order to install `pre-commit` and set it
 up, follow the instructions on https://pre-commit.com, or:
 
     pip install pre-commit
     pre-commit install
 
-Now, all of the hooks defined in the ``.pre-commit-config.yaml`` file should run
-when you try to commit code. To run them without committing code, run ``pre-commit run --all-files``.
+Now, all of the hooks defined in the `.pre-commit-config.yaml` file should run
+when you try to commit code. To run them without committing code, run `pre-commit run --all-files`.
 
 
 ## Tests
