@@ -8,8 +8,7 @@ from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     normalize_phone_cols,
     set_external_id_column,
-    split_cases_and_contacts,
-    upload_complete_records,
+    split_complete_and_incomplete_records, upload_complete_records,
     upload_incomplete_records,
 )
 
@@ -54,14 +53,13 @@ def test_normalize_phone_cols():
     pd.testing.assert_frame_equal(expected_output_df, output_df)
 
 
-@patch("cc_utilities.redcap_sync.upload_data_to_commcare")
-def test_upload_complete_records(mock_upload_to_commcare):
+def test_split_complete_and_incomplete_records():
     input_df = pd.DataFrame(
         {
             "record_id": ["1", "2", "3", "4"],
             "cdms_id": ["1111", "2222", "3333", "4444"],
-            "arbitrary": ["some", "arbitrary", None, np.NAN],
-            "stuff": ["some", "more", "values", "test"],
+            "arbitrary": ["some", "arbitrary", None, "test"],
+            "stuff": ["some", "more", "values", np.NAN],
             "external_id": ["1111", "2222", "3333", "4444"],
         },
         index=[1, 2, 3, 4],
@@ -76,22 +74,50 @@ def test_upload_complete_records(mock_upload_to_commcare):
         },
         index=[1, 2],
     )
-    upload_complete_records(input_df, "api-key", "project-name", "username")
-    uploaded_dataframe = mock_upload_to_commcare.call_args[0][0]
-    pd.testing.assert_frame_equal(uploaded_dataframe, expected_complete_records)
+    expected_incomplete_records = pd.DataFrame(
+        {
+            "record_id": ["3", "4"],
+            "cdms_id": ["3333", "4444"],
+            "arbitrary": [None, "test"],
+            "stuff": ["values", np.NAN],
+            "external_id": ["3333", "4444"],
+        },
+        index=[3, 4],
+    )
+    complete_records, incomplete_records = split_complete_and_incomplete_records(
+        input_df
+    )
+    pd.testing.assert_frame_equal(complete_records, expected_complete_records)
+    pd.testing.assert_frame_equal(incomplete_records, expected_incomplete_records)
 
+
+@patch("cc_utilities.redcap_sync.upload_data_to_commcare")
+def test_upload_complete_records(mock_upload_to_commcare):
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2"],
+            "cdms_id": ["1111", "2222"],
+            "arbitrary": ["some", "arbitrary"],
+            "stuff": ["some", "more"],
+            "external_id": ["1111", "2222"],
+        },
+        index=[1, 2],
+    )
+    upload_complete_records(input_df, "api-key", "project-name", "username")
+    mock_upload_to_commcare.assert_called_once()
+    uploaded_dataframe = mock_upload_to_commcare.call_args[0][0]
+    pd.testing.assert_frame_equal(uploaded_dataframe, input_df)
 
 @patch("cc_utilities.redcap_sync.upload_data_to_commcare")
 def test_upload_incomplete_records(mock_upload_to_commcare):
     input_df = pd.DataFrame(
         {
-            "record_id": ["1", "2", "3", "4"],
-            "cdms_id": ["1111", "2222", "3333", "4444"],
-            "arbitrary": ["some", "arbitrary", None, np.NAN],
-            "stuff": ["some", "more", "values", "test"],
-            "external_id": ["1111", "2222", "3333", "4444"],
+            "record_id": ["3", "4"],
+            "cdms_id": ["3333", "4444"],
+            "stuff": ["values", "test"],
+            "external_id": ["3333", "4444"],
         },
-        index=[1, 2, 3, 4],
+        index=[3, 4],
     )
     expected_incomplete_records = [
         pd.DataFrame(
@@ -145,97 +171,3 @@ def test_set_external_id_column():
     )
     output = set_external_id_column(input_df, external_id_col="cdms_id")
     pd.testing.assert_frame_equal(expected_output_df, output)
-
-
-@pytest.mark.skip(
-    reason="split_cases_and_contacts is unused and relies on old/outdated data"
-)
-def test_split_cases_and_contacts():
-    input_df = pd.DataFrame(
-        {
-            "record_id": ["1", "2", "2", "3", "3"],
-            "redcap_repeat_instrument": [
-                None,
-                None,
-                "close_contacts",
-                np.nan,
-                "close_contacts",
-            ],
-            "redcap_repeat_instance": [None, None, "1", None, "1"],
-            # Int64 (capital I) is the nullable integer type:
-            # https://pandas.pydata.org/pandas-docs/stable/user_guide/integer_na.html
-            "cdms_id": ["1234", "1234", None, "1234", None],
-            "arbitrary": ["some", "arbitrary", "values", "2", "test"],
-            "empty_col": [None, None, None, np.nan, np.nan],
-        },
-        index=[1, 2, 3, 4, 5],
-    )
-    expected_output_cases_df = pd.DataFrame(
-        {
-            "record_id": ["1", "2", "3"],
-            "cdms_id": ["1234", "1234", "1234"],
-            "arbitrary": ["some", "arbitrary", "2"],
-            "external_id": ["1234", "1234", "1234"],
-        },
-        index=[1, 2, 4],
-    )
-    expected_output_contacts_df = pd.DataFrame(
-        {
-            "record_id": ["2", "3"],
-            "arbitrary": ["values", "test"],
-            "parent_type": ["patient", "patient"],
-            "parent_external_id": ["1234", "1234"],
-            "external_id": [
-                "1234:redcap_repeat_instance:1",
-                "1234:redcap_repeat_instance:1",
-            ],
-        },
-        index=[3, 5],
-    )
-    cases_output_df, contacts_output_df = split_cases_and_contacts(
-        input_df, external_id_col="cdms_id"
-    )
-    pd.testing.assert_frame_equal(expected_output_cases_df, cases_output_df)
-    pd.testing.assert_frame_equal(expected_output_contacts_df, contacts_output_df)
-
-
-@pytest.mark.skip(
-    reason="split_cases_and_contacts is unused and relies on old/outdated data"
-)
-def test_split_cases_and_contacts_no_cdms_id():
-    with pytest.raises(ValueError):
-        split_cases_and_contacts(pd.DataFrame({}), external_id_col="cdms_id")
-
-
-@pytest.mark.skip(
-    reason="split_cases_and_contacts is unused and relies on old/outdated data"
-)
-def test_split_cases_and_contacts_no_contacts():
-    input_df = pd.DataFrame(
-        {
-            "record_id": ["1", "2", "3"],
-            "redcap_repeat_instrument": pd.Series([None, None, np.nan], dtype="object"),
-            "redcap_repeat_instance": pd.Series([None, None, None], dtype="object"),
-            "cdms_id": ["1234", "1234", "1234"],
-            "arbitrary": ["some", "arbitrary", "2"],
-            "empty_col": pd.Series([None, None, np.nan], dtype="object"),
-        },
-        index=[1, 2, 3],
-    )
-    expected_output_cases_df = pd.DataFrame(
-        {
-            "record_id": ["1", "2", "3"],
-            "cdms_id": ["1234", "1234", "1234"],
-            "arbitrary": ["some", "arbitrary", "2"],
-            "external_id": ["1234", "1234", "1234"],
-        },
-        index=[1, 2, 3],
-    )
-    expected_output_contacts_df = pd.DataFrame(
-        {}, index=pd.Int64Index([], dtype="int64"),
-    )
-    cases_output_df, contacts_output_df = split_cases_and_contacts(
-        input_df, external_id_col="cdms_id"
-    )
-    pd.testing.assert_frame_equal(expected_output_cases_df, cases_output_df)
-    pd.testing.assert_frame_equal(expected_output_contacts_df, contacts_output_df)

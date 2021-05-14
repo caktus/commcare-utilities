@@ -83,67 +83,36 @@ def normalize_phone_cols(df, phone_cols):
 
 def set_external_id_column(df, external_id_col):
     """
-    For the given external_id_col, copy to a new column named "external_id"
+    For the given external_id_col, drop any rows with no value and
+    copy to a new column named "external_id"
     """
-    df.dropna(subset=[external_id_col], inplace=True)
-    df["external_id"] = df[external_id_col]
+    df = df.dropna(subset=[external_id_col])
+    df.loc[:, "external_id"] = df[external_id_col]
     return df
 
 
-def split_cases_and_contacts(df, external_id_col):
+def split_complete_and_incomplete_records(cases_df):
     """
-    FIXME - this is unused and will need updating (the expected columns
-     redcap_repeat_instrument and redcap_repeat_instance don't exist).
-    Splits a single dataframe of cases and contacts in two, based on the values in the
-    "redcap_repeat_instrument" column, and assigns the columns necessary for import
-    to CommCare. `external_id_col` is the name of the REDCap column that should be assigned
-    to the external_id property in CommCare.
+    Splits the DataFrame into two - 'complete' meaning all rows with no
+    column values missing, and 'incomplete' is the remainder.
     """
-    required_cols = [
-        external_id_col,
-        "redcap_repeat_instrument",
-        "redcap_repeat_instance",
-        "record_id",
-    ]
-    for col_name in required_cols:
-        if col_name not in df.columns:
-            raise ValueError(f"Column {col_name} not found in REDCap")
-    # Rows with null value in "redcap_repeat_instrument" column and columns that contain
-    # only missing values removed.
-    cases_df = df.loc[df["redcap_repeat_instrument"].isnull()].dropna(axis=1, how="all")
-    cases_df["external_id"] = cases_df[external_id_col]
-    # Rows with "close_contacts" in "redcap_repeat_instrument" column and columns that
-    # contain only missing values removed.
-    contacts_df = df.loc[df["redcap_repeat_instrument"] == "close_contacts"].dropna(
-        axis=1, how="all"
-    )
-    if len(contacts_df.index) > 0:
-        contacts_df["parent_type"] = "patient"
-        contacts_df["parent_external_id"] = contacts_df.apply(
-            lambda row: cases_df.loc[
-                cases_df["record_id"] == row["record_id"], "external_id"
-            ].values[0],
-            axis=1,
-        )
-        contacts_df["external_id"] = contacts_df.apply(
-            lambda row: (
-                f"{row['parent_external_id']}:"
-                "redcap_repeat_instance:"
-                f"{row['redcap_repeat_instance']}"
-            ),
-            axis=1,
-        )
-        contacts_df = contacts_df.drop(
-            columns=["redcap_repeat_instrument", "redcap_repeat_instance"]
-        )
-    return cases_df, contacts_df
+    # Drop columns where all rows are missing data.
+    cases_df = cases_df.dropna(axis=1, how="all")
+    # Drop rows where any values are missing from columns.
+    complete_records = cases_df.dropna()
+    # The inverse; select rows where any values are missing from columns.
+    incomplete_records = cases_df[cases_df.isna().any(axis=1)]
+    return complete_records, incomplete_records
 
 
 def upload_complete_records(
-    cases_df, commcare_api_key, commcare_project_name, commcare_user_name
+    complete_records, commcare_api_key, commcare_project_name, commcare_user_name
 ):
-    """Drops all rows with any missing values and uploads the remainder to CommCare."""
-    complete_records = cases_df.dropna()
+    """Uploads the given DataFrame to CommCare if there are any rows."""
+    logger.info(
+        f"Uploading {len(complete_records.index)} found patients (cases) "
+        f"with complete records to CommCare..."
+    )
     if len(complete_records.index) > 0:
         upload_data_to_commcare(
             complete_records,
@@ -158,17 +127,23 @@ def upload_complete_records(
 
 
 def upload_incomplete_records(
-    cases_df, commcare_api_key, commcare_project_name, commcare_user_name
+    incomplete_records, commcare_api_key, commcare_project_name, commcare_user_name
 ):
     """
     To avoid overwriting existing data in CommCare with blank values,
     iterate over the incomplete records one by one, drop any blank/null values
     before uploading to CommCare.
+    **Note that iterating over rows of a DataFrame is slow and not recommended for
+    most use cases!
     """
-    incomplete_records = cases_df[cases_df.isna().any(axis=1)]
+    logger.info(
+        f"Uploading {len(incomplete_records.index)} found patients (cases) "
+        f"with incomplete records to CommCare..."
+    )
     for index, row in incomplete_records.iterrows():
         # Drops any values in this Series with missing/NA values,
         # and converts it back to a DataFrame.
+        # **Note that iterrows does not preserve the type of a cell.
         data = row.dropna().to_frame().transpose()
         upload_data_to_commcare(
             data,

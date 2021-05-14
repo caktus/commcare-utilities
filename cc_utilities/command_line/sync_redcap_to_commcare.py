@@ -10,7 +10,7 @@ from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     normalize_phone_cols,
     set_external_id_column,
-    upload_complete_records,
+    split_complete_and_incomplete_records, upload_complete_records,
     upload_incomplete_records,
 )
 
@@ -100,19 +100,17 @@ def main_with_args(
         if len(redcap_records.index) == 0:
             logger.info("No records returned from REDCap; aborting sync.")
         else:
-            cases_df = (
+            complete_records, incomplete_records = (
                 redcap_records.pipe(collapse_checkbox_columns)
                 .pipe(normalize_phone_cols, phone_cols)
                 .pipe(set_external_id_column, external_id_col)
-            )
-            logger.info(
-                f"Uploading {len(cases_df.index)} found patients (cases) to CommCare..."
+                .pipe(split_complete_and_incomplete_records)
             )
             upload_complete_records(
-                cases_df, commcare_api_key, commcare_project_name, commcare_user_name
+                complete_records, commcare_api_key, commcare_project_name, commcare_user_name
             )
             upload_incomplete_records(
-                cases_df, commcare_api_key, commcare_project_name, commcare_user_name
+                incomplete_records, commcare_api_key, commcare_project_name, commcare_user_name
             )
         state["date_begin"] = next_date_begin
     finally:
