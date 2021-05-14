@@ -25,10 +25,31 @@ This repo is for an assortment of scripts for developers working with Commcare.
 
 ## Setup
 
+#### System pre-requisites
+
+- Python 3.7 (and libpython3.7-dev for linux)
+- unixodbc-dev
+- tox
+
+#### Install
+
 1. Create and source a virtual environment.
 2. `pip3 install -e .`
 3. Check if there are additional dependencies required for any of the scripts you wish to run (see below), and install them.
 4. Enjoy.
+
+#### Pre Commit
+
+This repository uses [pre-commit](https://pre-commit.com) in order to run lint
+checks and tests on every commit. In order to install `pre-commit` and set it
+up, follow the instructions on https://pre-commit.com, or:
+
+    pip install pre-commit
+    pre-commit install
+
+Now, all of the hooks defined in the `.pre-commit-config.yaml` file should run
+when you try to commit code. To run them without committing code, run `pre-commit run --all-files`.
+
 
 ## Tests
 
