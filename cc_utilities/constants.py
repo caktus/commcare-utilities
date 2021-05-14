@@ -9,6 +9,7 @@ COMMCARE_UPLOAD_STATES = dict(missing=-1, not_started=0, started=1, success=2, f
 COMMCARE_UNSET_CAN_SMS_LABEL = "pending"
 COMMCARE_CANNOT_SMS_LABEL = "no"
 COMMCARE_CAN_SMS_LABEL = "yes"
+DOB_FIELD = "dob"
 REDCAP_HOUSING_1_FIELD = "housing_1"
 REDCAP_HOUSING_2_FIELD = "housing_2"
 REDCAP_HOUSING_FIELD = "housing"

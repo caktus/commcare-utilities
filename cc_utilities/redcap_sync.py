@@ -2,9 +2,11 @@ from collections import defaultdict
 from functools import partial
 
 import pandas as pd
+from sqlalchemy import MetaData, Table, and_, create_engine, select
 
 from .common import upload_data_to_commcare
 from .constants import (
+    DOB_FIELD,
     REDCAP_HOUSING_1_FIELD,
     REDCAP_HOUSING_2_FIELD,
     REDCAP_HOUSING_FIELD,
@@ -104,6 +106,34 @@ def normalize_phone_cols(df, phone_cols):
             .apply(partial(normalize_phone_number, col_name=col_name))
         )
     return df
+
+
+def match_record_to_cdms(external_id, dob, db_url, table_name="record"):
+    """
+    Look up records by external_id' and 'dob'. This will be used to reject records
+    that do not match, to avoid overwriting existing patient records with
+    another patient's data.
+
+    TODO:
+      - Get a real database URL, and the real table_name and column names.
+      - Apply this to bulk records, not just one at a time.
+    """
+    engine = create_engine(db_url)
+    meta = MetaData(bind=engine)
+    table = Table(table_name, meta, autoload=True, autoload_with=engine)
+    assert DOB_FIELD in [
+        col.name for col in table.columns
+    ], f"{DOB_FIELD} not in {table_name} table"
+    wheres = [getattr(table.c, "id") == external_id, getattr(table.c, DOB_FIELD) == dob]
+    query = select([getattr(table.c, "id"), getattr(table.c, DOB_FIELD)]).where(
+        and_(*wheres)
+    )
+    conn = engine.connect()
+    try:
+        result = conn.execute(query)
+        return [dict(row) for row in result.fetchall()]
+    finally:
+        conn.close()
 
 
 def set_external_id_column(df, external_id_col):
