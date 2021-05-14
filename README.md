@@ -40,7 +40,7 @@ This repo is for an assortment of scripts for developers working with Commcare.
 
 #### Pre Commit
 
-This repository uses `pre-commit <https://pre-commit.com>`_ in order to run lint
+This repository uses [pre-commit](https://pre-commit.com) in order to run lint
 checks and tests on every commit. In order to install ``pre-commit`` and set it
 up, follow the instructions on https://pre-commit.com, or:
 
