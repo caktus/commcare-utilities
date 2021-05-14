@@ -90,7 +90,7 @@ def main():
         help="The Commcare username (email address)",
         dest="commcare_user_name",
     )
-    parser.add_argument("--api-key", help="A Commcare API key", dest="commcare_api_key")
+    parser.add_argument("--apikey", help="A Commcare API key", dest="commcare_api_key")
     parser.add_argument(
         "--project", help="The Commcare project name", dest="commcare_project_name"
     )

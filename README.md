@@ -81,7 +81,7 @@ While additional options are available, it's worth calling out two important, re
 Available command line arguments and flags:
 
 - `--username`: Mandatory. The Commcare username (email address). **NOTE** this account will also need to have the `System Admin (API)` user role in order for the script to work.
-- `--api-key`: Mandatory. An API key associated with username
+- `--apikey`: Mandatory. An API key associated with username
 - `--project`: Mandatory. The Commcare projecct name
 - `--app-id`: Mandatory. The ID of the Commcare app
 - `--db-url`: Mandatory. The URL string of the db to sync to
@@ -116,7 +116,7 @@ Running the script as follows would sync all discovered case types and save a JS
 ```linux
 sync-commcare-app-to-db \
   --username $COMMCARE_USER_NAME \
-  --api-key $COMMCARE_API_KEY \
+  --apikey $COMMCARE_API_KEY \
   --project $COMMCARE_PROJECT_NAME \
   --app-id $APPLICATION_ID \
   --db-url $DB_URL \
@@ -128,7 +128,7 @@ To specify only a subset of case types — for instance, contact and patient —
 ```linux
 sync-commcare-app-to-db \
   --username $COMMCARE_USER_NAME \
-  --api-key $COMMCARE_API_KEY \
+  --apikey $COMMCARE_API_KEY \
   --project $COMMCARE_PROJECT_NAME \
   --app-id $APPLICATION_ID \
   --db-url $DB_URL \
@@ -141,7 +141,7 @@ To use a pre-existing JSON file and avoid making a request to the Application St
 ```linux
 sync-commcare-app-to-db \
   --username $COMMCARE_USER_NAME \
-  --api-key $COMMCARE_API_KEY \
+  --apikey $COMMCARE_API_KEY \
   --project $COMMCARE_PROJECT_NAME \
   --app-id $APPLICATION_ID \
   --db-url $DB_URL \
@@ -187,7 +187,7 @@ Finally, note that this script presently is configured to work with US-based pho
 2. Gather your Twilio SID and auth token.
 3. Install the appropriate db engine library for your database. If you're not sure what that is, run the script without doing this, and you'll get a `ModuleNotFoundError` with the name of the required library.
 4. Optionally, copy over `sample.env` to `.env` and insert appropriate values. Source those values before the next step.
-5. Run the script. Assuming the referenced variables are set: `process-numbers-for-sms-capability --db $DB_URL --username $COMMCARE_USER_NAME --api-key $COMMCARE_API_KEY --project $COMMCARE_PROJECT_NAME --twilio-sid $TWILIO_SID --twilio-token $TWILIO_TOKEN` --case-type contact.
+5. Run the script. Assuming the referenced variables are set: `process-numbers-for-sms-capability --db $DB_URL --username $COMMCARE_USER_NAME --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT_NAME --twilio-sid $TWILIO_SID --twilio-token $TWILIO_TOKEN` --case-type contact.
 6. Any new columns added to the DB will be noted in the command-line output of the script.
 
 ### `bulk-upload-legacy-contact-data`
@@ -245,7 +245,7 @@ Here are the steps to create this asset:
 Assuming you have sourced the appropriate environment variables and that you have the data dictionary CSV and legacy contact data CSV as described above, the following command will run the script:
 
 ```linux
-bulk-upload-legacy-contact-data --username $COMMCARE_USER_NAME --api-key $COMMCARE_API_KEY --project $COMMCARE_PROJECT_NAME --caseDataPath <path-to-contact-data-to-be-uploaded> --dataDictPath <path-to-data-dict> --reportingPath <path-where-reporting-assets-will-be-created> --requiredOneOfs contact_phone_number commcare_email_address --contactKeyValDict '{"additionalID": "additionalValue"}'
+bulk-upload-legacy-contact-data --username $COMMCARE_USER_NAME --apikey $COMMCARE_API_KEY --project $COMMCARE_PROJECT_NAME --caseDataPath <path-to-contact-data-to-be-uploaded> --dataDictPath <path-to-data-dict> --reportingPath <path-where-reporting-assets-will-be-created> --requiredOneOfs contact_phone_number commcare_email_address --contactKeyValDict '{"additionalID": "additionalValue"}'
 ```
 
 Note that the `--requiredOneofs` is an optional argument. Space separated values sent in here will be used to generate a list of columns for which each row must have at least one valid, non-null value in order for the row to be declared valid.
@@ -291,7 +291,7 @@ To use the script, see its `--help` output:
 
 ```
 sync-redcap-to-commcare --help
-usage: sync-redcap-to-commcare [-h] --username COMMCARE_USER_NAME --api-key
+usage: sync-redcap-to-commcare [-h] --username COMMCARE_USER_NAME --apikey
                                COMMCARE_API_KEY --project
                                COMMCARE_PROJECT_NAME --redcap-api-url
                                REDCAP_API_URL --redcap-api-key REDCAP_API_KEY
@@ -302,7 +302,7 @@ optional arguments:
   -h, --help            show this help message and exit
   --username COMMCARE_USER_NAME
                         The Commcare username (email address)
-  --api-key COMMCARE_API_KEY
+  --apikey COMMCARE_API_KEY
                         A Commcare API key
   --project COMMCARE_PROJECT_NAME
                         The Commcare project name
@@ -324,7 +324,7 @@ Sample command:
 ```linux
 sync-redcap-to-commcare \
   --username=$COMMCARE_USER_NAME \
-  --api-key=$COMMCARE_API_KEY \
+  --apikey=$COMMCARE_API_KEY \
   --project=$COMMCARE_PROJECT_NAME \
   --redcap-api-url=$REDCAP_API_URL \
   --redcap-api-key=$REDCAP_API_KEY \
