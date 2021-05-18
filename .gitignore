@@ -12,3 +12,4 @@ logs
 __pycache__/
 .tox/
 .python-version
+.idea

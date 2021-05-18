@@ -328,7 +328,7 @@ sync-redcap-to-commcare \
   --project=$COMMCARE_PROJECT_NAME \
   --redcap-api-url=$REDCAP_API_URL \
   --redcap-api-key=$REDCAP_API_KEY \
-  --external-id-col=our_mrs_id \
+  --external-id-col=cdms_id \
   --state-file=redcap_test.yaml \
   --sync-all
 ```
