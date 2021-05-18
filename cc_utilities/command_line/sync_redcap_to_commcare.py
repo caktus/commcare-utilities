@@ -10,7 +10,8 @@ from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     normalize_phone_cols,
     set_external_id_column,
-    split_complete_and_incomplete_records, upload_complete_records,
+    split_complete_and_incomplete_records,
+    upload_complete_records,
     upload_incomplete_records,
 )
 
@@ -107,10 +108,16 @@ def main_with_args(
                 .pipe(split_complete_and_incomplete_records)
             )
             upload_complete_records(
-                complete_records, commcare_api_key, commcare_project_name, commcare_user_name
+                complete_records,
+                commcare_api_key,
+                commcare_project_name,
+                commcare_user_name,
             )
             upload_incomplete_records(
-                incomplete_records, commcare_api_key, commcare_project_name, commcare_user_name
+                incomplete_records,
+                commcare_api_key,
+                commcare_project_name,
+                commcare_user_name,
             )
         state["date_begin"] = next_date_begin
     finally:

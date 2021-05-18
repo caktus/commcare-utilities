@@ -2,13 +2,13 @@ from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     normalize_phone_cols,
     set_external_id_column,
-    split_complete_and_incomplete_records, upload_complete_records,
+    split_complete_and_incomplete_records,
+    upload_complete_records,
     upload_incomplete_records,
 )
 
@@ -107,6 +107,7 @@ def test_upload_complete_records(mock_upload_to_commcare):
     mock_upload_to_commcare.assert_called_once()
     uploaded_dataframe = mock_upload_to_commcare.call_args[0][0]
     pd.testing.assert_frame_equal(uploaded_dataframe, input_df)
+
 
 @patch("cc_utilities.redcap_sync.upload_data_to_commcare")
 def test_upload_incomplete_records(mock_upload_to_commcare):
