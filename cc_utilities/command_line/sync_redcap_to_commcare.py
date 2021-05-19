@@ -5,13 +5,16 @@ from datetime import datetime
 import redcap
 import yaml
 
+from cc_utilities.constants import DOB_FIELD
 from cc_utilities.logger import logger
 from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     collapse_housing_fields,
+    get_matching_cdms_patients,
     normalize_phone_cols,
     set_external_id_column,
     split_complete_and_incomplete_records,
+    split_records_by_cdms_matches,
     upload_complete_records,
     upload_incomplete_records,
 )
@@ -43,6 +46,7 @@ def main_with_args(
     external_id_col,
     phone_cols,
     state_file,
+    db_url,
     sync_all,
 ):
     """
@@ -59,6 +63,7 @@ def main_with_args(
         external_id_col (str): The name of the column in REDCap that contains the external_id for CommCare
         phone_cols (list): List of phone columns that should be normalized for CommCare
         state_file (str): File path to a local file where state about this sync can be kept
+        db_url (str): the db connection URL to query for existing patients.
         sync_all (bool): If set, ignore the date_begin in the state_file and sync all records
     """
 
@@ -102,12 +107,21 @@ def main_with_args(
         if len(redcap_records.index) == 0:
             logger.info("No records returned from REDCap; aborting sync.")
         else:
-            complete_records, incomplete_records = (
+            df = (
                 redcap_records.pipe(collapse_checkbox_columns)
                 .pipe(normalize_phone_cols, phone_cols)
                 .pipe(collapse_housing_fields)
                 .pipe(set_external_id_column, external_id_col)
-                .pipe(split_complete_and_incomplete_records)
+                .dropna(subset=[DOB_FIELD])
+            )
+
+            matching_ids = get_matching_cdms_patients(df, db_url, external_id_col)
+            matched_records, unmatched_records = split_records_by_cdms_matches(
+                df, matching_ids, external_id_col
+            )
+
+            complete_records, incomplete_records = matched_records.pipe(
+                split_complete_and_incomplete_records
             )
             upload_complete_records(
                 complete_records,
@@ -168,6 +182,11 @@ def main():
         required=True,
     )
     parser.add_argument(
+        "--db",
+        help="The database URL string of the db that contains patient data",
+        dest="db_url",
+    )
+    parser.add_argument(
         "--sync-all",
         help="If set, ignore the begin date in the state file and sync all records",
         action="store_true",
@@ -182,5 +201,6 @@ def main():
         args.external_id_col,
         args.phone_cols or [],
         args.state_file,
+        args.db_url,
         args.sync_all,
     )

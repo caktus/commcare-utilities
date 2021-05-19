@@ -2,7 +2,7 @@ from collections import defaultdict
 from functools import partial
 
 import pandas as pd
-from sqlalchemy import MetaData, Table, and_, create_engine, select
+from sqlalchemy import MetaData, Table, and_, create_engine, or_, select
 
 from .common import upload_data_to_commcare
 from .constants import (
@@ -108,32 +108,63 @@ def normalize_phone_cols(df, phone_cols):
     return df
 
 
-def match_record_to_cdms(external_id, dob, db_url, table_name="record"):
+def get_matching_cdms_patients(df, db_url, external_id_col, table_name="patient"):
     """
-    Look up records by external_id' and 'dob'. This will be used to reject records
+    Look up records by CDMS ID and DOB. This will be used to reject records
     that do not match, to avoid overwriting existing patient records with
     another patient's data.
 
-    TODO:
-      - Get a real database URL, and the real table_name and column names.
-      - Apply this to bulk records, not just one at a time.
+    returns a list of matching rows, with external_id_col values.
     """
+    # Load table
     engine = create_engine(db_url)
     meta = MetaData(bind=engine)
     table = Table(table_name, meta, autoload=True, autoload_with=engine)
-    assert DOB_FIELD in [
-        col.name for col in table.columns
-    ], f"{DOB_FIELD} not in {table_name} table"
-    wheres = [getattr(table.c, "id") == external_id, getattr(table.c, DOB_FIELD) == dob]
-    query = select([getattr(table.c, "id"), getattr(table.c, DOB_FIELD)]).where(
-        and_(*wheres)
+
+    # Validate columns
+    column_names = [col.name for col in table.columns]
+    assert DOB_FIELD in column_names, f"{DOB_FIELD} not in {table_name} table"
+    assert (
+        external_id_col in column_names
+    ), f"{external_id_col} not in {table_name} table"
+
+    # Define the query
+    wheres = []
+    for record in df.itertuples():
+        dob = record.dob
+        external_id = getattr(record, external_id_col)
+        wheres.append(
+            [
+                getattr(table.c, external_id_col) == external_id,
+                getattr(table.c, DOB_FIELD) == dob,
+            ]
+        )
+    query = select([getattr(table.c, external_id_col)]).where(
+        or_(*[and_(*where) for where in wheres])
     )
+
+    # Execute
     conn = engine.connect()
     try:
         result = conn.execute(query)
         return [dict(row) for row in result.fetchall()]
     finally:
         conn.close()
+
+
+def split_records_by_cdms_matches(df, matched_external_ids, external_id_col):
+    """
+    Given the subset of external IDs in matched_external_ids,
+    return two DataFrames; one with those matched patients and one without.
+    """
+    matched_external_ids = [m[external_id_col] for m in matched_external_ids]
+    unmatched_records = df.where(
+        -df[external_id_col].isin(matched_external_ids)
+    ).dropna(subset=[external_id_col])
+    matched_records = df.where(df[external_id_col].isin(matched_external_ids)).dropna(
+        subset=[external_id_col]
+    )
+    return matched_records, unmatched_records
 
 
 def set_external_id_column(df, external_id_col):
@@ -146,17 +177,17 @@ def set_external_id_column(df, external_id_col):
     return df
 
 
-def split_complete_and_incomplete_records(cases_df):
+def split_complete_and_incomplete_records(df):
     """
     Splits the DataFrame into two - 'complete' meaning all rows with no
     column values missing, and 'incomplete' is the remainder.
     """
     # Drop columns where all rows are missing data.
-    cases_df = cases_df.dropna(axis=1, how="all")
+    df = df.dropna(axis=1, how="all")
     # Drop rows where any values are missing from columns.
-    complete_records = cases_df.dropna()
+    complete_records = df.dropna()
     # The inverse; select rows where any values are missing from columns.
-    incomplete_records = cases_df[cases_df.isna().any(axis=1)]
+    incomplete_records = df[df.isna().any(axis=1)]
     return complete_records, incomplete_records
 
 
