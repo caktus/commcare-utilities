@@ -5,16 +5,15 @@ from datetime import datetime
 import redcap
 import yaml
 
-from cc_utilities.constants import DOB_FIELD
 from cc_utilities.logger import logger
 from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     collapse_housing_fields,
     get_matching_cdms_patients,
+    handle_cdms_matching,
     normalize_phone_cols,
     set_external_id_column,
     split_complete_and_incomplete_records,
-    split_records_by_cdms_matches,
     upload_complete_records,
     upload_incomplete_records,
 )
@@ -107,21 +106,20 @@ def main_with_args(
         if len(redcap_records.index) == 0:
             logger.info("No records returned from REDCap; aborting sync.")
         else:
-            df = (
+            complete_records, incomplete_records = (
                 redcap_records.pipe(collapse_checkbox_columns)
                 .pipe(normalize_phone_cols, phone_cols)
                 .pipe(collapse_housing_fields)
                 .pipe(set_external_id_column, external_id_col)
-                .dropna(subset=[DOB_FIELD])
-            )
-
-            matching_ids = get_matching_cdms_patients(df, db_url, external_id_col)
-            matched_records, unmatched_records = split_records_by_cdms_matches(
-                df, matching_ids, external_id_col
-            )
-
-            complete_records, incomplete_records = matched_records.pipe(
-                split_complete_and_incomplete_records
+                .pipe(
+                    handle_cdms_matching,
+                    redcap_records,
+                    db_url,
+                    external_id_col,
+                    redcap_api_url,
+                    redcap_api_key,
+                )
+                .pipe(split_complete_and_incomplete_records)
             )
             upload_complete_records(
                 complete_records,

@@ -1,15 +1,17 @@
+from datetime import datetime
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
 
 from cc_utilities.redcap_sync import (
+    add_reject_status_columns,
     collapse_checkbox_columns,
     collapse_housing_fields,
     normalize_phone_cols,
+    select_records_by_cdms_matches,
     set_external_id_column,
     split_complete_and_incomplete_records,
-    split_records_by_cdms_matches,
     upload_complete_records,
     upload_incomplete_records,
 )
@@ -199,12 +201,27 @@ def test_collapse_housing_fields():
     pd.testing.assert_frame_equal(expected_output_df, output_df)
 
 
-def test_split_records_by_cdms_matches():
+def test_select_records_by_cdms_matches():
+    """
+    Given a dictionary containing external IDs from CDMS based on values
+    that matched on both the external ID and DOB fields, select_records_by_cdms_matches
+    should return two DataFrames by selecting the matched / mismatched rows.
+    """
     external_id_col = "cdms_id"
+    input_redcap_records = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3"],
+            "cdms_id": ["1111", "2222", "3333"],
+            "dob": ["2001-01-01", "1953-03-17", "1933-02-04"],
+            "other_stuff": ["some", "more", "values"],
+        },
+        index=[1, 2, 3],
+    )
     input_df = pd.DataFrame(
         {
             "record_id": ["1", "2", "3"],
             "cdms_id": ["1111", "2222", "3333"],
+            "external_id": ["1111", "2222", "3333"],
             "dob": ["2001-01-01", "1953-03-17", "1933-02-04"],
             "other_stuff": ["some", "more", "values"],
         },
@@ -214,6 +231,7 @@ def test_split_records_by_cdms_matches():
         {
             "record_id": ["1", "3"],
             "cdms_id": ["1111", "3333"],
+            "external_id": ["1111", "3333"],
             "dob": ["2001-01-01", "1933-02-04"],
             "other_stuff": ["some", "values"],
         },
@@ -229,8 +247,42 @@ def test_split_records_by_cdms_matches():
         index=[2],
     )
     matching_ids = [{external_id_col: "1111"}, {external_id_col: "3333"}]
-    matching_records, unmatching_records = split_records_by_cdms_matches(
-        input_df, matched_external_ids=matching_ids, external_id_col=external_id_col
+    matching_records, unmatching_records = select_records_by_cdms_matches(
+        input_df,
+        input_redcap_records,
+        matched_external_ids=matching_ids,
+        external_id_col=external_id_col,
     )
     pd.testing.assert_frame_equal(matching_records, expected_matching_df)
     pd.testing.assert_frame_equal(unmatching_records, expected_not_matching_df)
+
+
+def test_add_reject_status_columns():
+    dob_field = "dob"
+    external_id_col = "cdms_id"
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3"],
+            "cdms_id": ["1111", "2222", "3333"],
+            "dob": ["2001-01-01", "1953-03-17", "1933-02-04"],
+            "other_stuff": ["some", "more", "values"],
+        },
+        index=[1, 2, 3],
+    )
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    expected_output_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3"],
+            "cdms_id": ["1111", "2222", "3333"],
+            "dob": ["2001-01-01", "1953-03-17", "1933-02-04"],
+            "other_stuff": ["some", "more", "values"],
+            "integration_status": ["rejected_person_mismatch" for i in range(3)],
+            "integration_status_timestamp": [timestamp for i in range(3)],
+            "integration_status_reason": [
+                f"mismatched {dob_field} and {external_id_col}" for i in range(3)
+            ],
+        },
+        index=[1, 2, 3],
+    )
+    output_df = add_reject_status_columns(input_df, external_id_col)
+    pd.testing.assert_frame_equal(expected_output_df, output_df)
