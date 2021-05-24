@@ -8,6 +8,7 @@ import yaml
 from cc_utilities.logger import logger
 from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
+    collapse_housing_fields,
     normalize_phone_cols,
     set_external_id_column,
     split_complete_and_incomplete_records,
@@ -104,6 +105,7 @@ def main_with_args(
             complete_records, incomplete_records = (
                 redcap_records.pipe(collapse_checkbox_columns)
                 .pipe(normalize_phone_cols, phone_cols)
+                .pipe(collapse_housing_fields)
                 .pipe(set_external_id_column, external_id_col)
                 .pipe(split_complete_and_incomplete_records)
             )

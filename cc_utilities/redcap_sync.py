@@ -4,6 +4,12 @@ from functools import partial
 import pandas as pd
 
 from .common import upload_data_to_commcare
+from .constants import (
+    REDCAP_HOUSING_1_FIELD,
+    REDCAP_HOUSING_2_FIELD,
+    REDCAP_HOUSING_FIELD,
+    REDCAP_HOUSING_OTHER,
+)
 from .legacy_upload import normalize_phone_number
 from .logger import logger
 
@@ -63,6 +69,25 @@ def collapse_checkbox_columns(df):
         redcap_cols = [col for col, _ in source_val_list]
         logger.info(f"Dropping columns {redcap_cols} from df")
         df.drop(columns=redcap_cols, inplace=True)
+    return df
+
+
+def collapse_housing_fields(df):
+    """
+    Reduce the 3 REDCap housing columns to one 'housing' column;
+    By default, use the value of housing_1 and add to 'housing'.
+    If the value of housing_1 is 'other', then select the value of 'housing_2'.
+    """
+    df = df.copy()
+
+    def apply_collapse_housing(row):
+        housing = row[REDCAP_HOUSING_1_FIELD]
+        if row[REDCAP_HOUSING_1_FIELD] == REDCAP_HOUSING_OTHER:
+            housing = row[REDCAP_HOUSING_2_FIELD]
+        return housing
+
+    df[REDCAP_HOUSING_FIELD] = df.apply(lambda row: apply_collapse_housing(row), axis=1)
+    df = df.drop([REDCAP_HOUSING_1_FIELD, REDCAP_HOUSING_2_FIELD], axis=1)
     return df
 
 
