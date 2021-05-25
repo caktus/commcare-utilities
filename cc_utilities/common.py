@@ -219,7 +219,7 @@ def upload_data_to_commcare(
             response_.json()["state"] == COMMCARE_UPLOAD_STATES["success"]
             and len(errors) == 0
         ):
-            logger.info("Succesfully uploaded. All done.")
+            logger.info("Successfully uploaded. All done.")
             break
 
         if (

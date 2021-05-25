@@ -1,4 +1,10 @@
+import sys
+from unittest.mock import MagicMock
+
 import pytest
+
+# Globally mock the redcap module (not installed with tox, so can't be imported)
+sys.modules["redcap"] = MagicMock()
 
 
 @pytest.fixture(autouse=True)

@@ -9,7 +9,6 @@ from cc_utilities.logger import logger
 from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     collapse_housing_fields,
-    get_matching_cdms_patients,
     handle_cdms_matching,
     normalize_phone_cols,
     set_external_id_column,

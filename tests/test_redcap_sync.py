@@ -4,10 +4,17 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 
+from cc_utilities.constants import (
+    REDCAP_INTEGRATION_STATUS,
+    REDCAP_INTEGRATION_STATUS_REASON,
+    REDCAP_INTEGRATION_STATUS_TIMESTAMP,
+    REDCAP_REJECTED_PERSON,
+)
 from cc_utilities.redcap_sync import (
     add_reject_status_columns,
     collapse_checkbox_columns,
     collapse_housing_fields,
+    handle_cdms_matching,
     normalize_phone_cols,
     select_records_by_cdms_matches,
     set_external_id_column,
@@ -270,19 +277,99 @@ def test_add_reject_status_columns():
         index=[1, 2, 3],
     )
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    reason = f"mismatched {dob_field} and {external_id_col}"
     expected_output_df = pd.DataFrame(
         {
             "record_id": ["1", "2", "3"],
             "cdms_id": ["1111", "2222", "3333"],
             "dob": ["2001-01-01", "1953-03-17", "1933-02-04"],
             "other_stuff": ["some", "more", "values"],
-            "integration_status": ["rejected_person_mismatch" for i in range(3)],
+            "integration_status": ["rejected_person" for i in range(3)],
             "integration_status_timestamp": [timestamp for i in range(3)],
-            "integration_status_reason": [
-                f"mismatched {dob_field} and {external_id_col}" for i in range(3)
-            ],
+            "integration_status_reason": [reason for i in range(3)],
         },
         index=[1, 2, 3],
     )
-    output_df = add_reject_status_columns(input_df, external_id_col)
+    output_df = add_reject_status_columns(input_df, reason)
     pd.testing.assert_frame_equal(expected_output_df, output_df)
+
+
+def test_handle_cdms_matching():
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3"],
+            "cdms_id": ["1111", "2222", "3333"],
+            "external_id": ["1111", "2222", "3333"],
+            "dob": [None, "1953-03-17", "1933-02-04"],
+            "other_stuff": ["some", "more", "values"],
+        },
+        index=[1, 2, 3],
+    )
+    input_redcap_records = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3"],
+            "cdms_id": ["1111", "2222", "3333"],
+            "dob": [None, "1953-03-17", "1933-02-04"],
+            "other_stuff": ["some", "more", "values"],
+        },
+        index=[1, 2, 3],
+    )
+
+    expected_matched_cdms_ids = [{"cdms_id": "2222"}]
+    expected_output_df = pd.DataFrame(
+        {
+            "record_id": ["2"],
+            "cdms_id": ["2222"],
+            "external_id": ["2222"],
+            "dob": ["1953-03-17"],
+            "other_stuff": ["more"],
+        },
+        index=[2],
+    )
+    expected_error_status_columns = {
+        REDCAP_INTEGRATION_STATUS: [REDCAP_REJECTED_PERSON for i in range(2)],
+        REDCAP_INTEGRATION_STATUS_TIMESTAMP: [
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S") for i in range(2)
+        ],
+        REDCAP_INTEGRATION_STATUS_REASON: [
+            "mismatched dob and cdms_id" for i in range(2)
+        ],
+    }
+    expected_unmatched_records = pd.DataFrame(
+        {
+            "record_id": ["1", "3"],
+            "cdms_id": ["1111", "3333"],
+            "dob": [None, "1933-02-04"],
+            "other_stuff": ["some", "values"],
+            **expected_error_status_columns,
+        },
+        index=[1, 3],
+    )
+    # Should drop NA on DOB,
+    # match records in CDMS
+    # split records by matches / non-matches
+    # add error columns to rejects
+    # send rejects back to REDCap
+    # return the matching df.
+
+    with patch(
+        "cc_utilities.redcap_sync.get_matching_cdms_patients",
+        return_value=expected_matched_cdms_ids,
+    ) as mock_get_matching_cdms_patients:
+        with patch(
+            "cc_utilities.redcap_sync.send_back_to_redcap"
+        ) as mock_send_back_to_redcap:
+            output = handle_cdms_matching(
+                input_df,
+                input_redcap_records,
+                db_url="test",
+                external_id_col="cdms_id",
+                redcap_api_url="test",
+                redcap_api_key="test",
+            )
+
+    mock_get_matching_cdms_patients.assert_called_once()
+    pd.testing.assert_frame_equal(
+        mock_send_back_to_redcap.call_args[0][0], expected_unmatched_records
+    )
+    pd.testing.assert_frame_equal(output, expected_output_df)
