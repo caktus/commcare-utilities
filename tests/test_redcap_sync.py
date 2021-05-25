@@ -5,6 +5,7 @@ import pandas as pd
 
 from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
+    collapse_housing_fields,
     normalize_phone_cols,
     set_external_id_column,
     split_complete_and_incomplete_records,
@@ -172,3 +173,26 @@ def test_set_external_id_column():
     )
     output = set_external_id_column(input_df, external_id_col="cdms_id")
     pd.testing.assert_frame_equal(expected_output_df, output)
+
+
+def test_collapse_housing_fields():
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3", "4"],
+            "cdms_id": ["1111", None, "3333", None],
+            "housing_1": ["other", "somethin", None, "value"],
+            "housing_2": ["senior", None, None, None],
+            "housing": [None, None, None, None],
+        },
+        index=[1, 2, 3, 4],
+    )
+    expected_output_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3", "4"],
+            "cdms_id": ["1111", None, "3333", None],
+            "housing": ["senior", "somethin", None, "value"],
+        },
+        index=[1, 2, 3, 4],
+    )
+    output_df = collapse_housing_fields(input_df)
+    pd.testing.assert_frame_equal(expected_output_df, output_df)
