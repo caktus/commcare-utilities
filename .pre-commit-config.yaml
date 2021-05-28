@@ -22,3 +22,8 @@ repos:
   rev: 3.8.3
   hooks:
     - id: flake8
+- repo: https://github.com/kynan/nbstripout
+  rev: 0.4.0
+  hooks:
+    - id: nbstripout
+      files: notebooks/
