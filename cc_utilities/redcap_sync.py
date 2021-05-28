@@ -15,6 +15,7 @@ from .constants import (
     REDCAP_HOUSING_OTHER,
     REDCAP_INTEGRATION_STATUS_REASON,
     REDCAP_INTEGRATION_STATUS_TIMESTAMP,
+    REDCAP_RECORD_ID,
     REDCAP_REJECTED_INTEGRATION_STATUS_COLUMNS,
 )
 from .legacy_upload import normalize_phone_number
@@ -173,14 +174,14 @@ def select_records_by_cdms_matches(
     """
     Given the subset of external IDs in matched_external_ids,
     return two DataFrames; one with those matched patients and one without.
-    For unmatched patients, select from the original redcap_records dataframe
-    because these will be sent back to REDCap and should not be sent back with
-    CommCare-specific transformations and columns.
+    For unmatched patients, select from redcap_records to include records
+    missing external_id or dob, select only the record_id column to avoid
+    updating any data in REDCap that may have changed during this sync.
     """
     matched_external_ids = [m[external_id_col] for m in matched_external_ids]
     unmatched_records = redcap_records.where(
         ~redcap_records[external_id_col].isin(matched_external_ids)
-    ).dropna(subset=[external_id_col])
+    ).dropna(subset=[external_id_col])[[REDCAP_RECORD_ID]]
     matched_records = df.where(df[external_id_col].isin(matched_external_ids)).dropna(
         subset=[external_id_col]
     )
@@ -192,6 +193,10 @@ def select_records_by_cdms_matches(
 
 
 def add_reject_status_columns(reject_records, reason):
+    """
+    Add integration status columns with values to indicate rejection of the records,
+    when they were rejected, and a reason so the records can be reviewed by a human.
+    """
     df = reject_records.copy()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     status_columns_and_values = REDCAP_REJECTED_INTEGRATION_STATUS_COLUMNS.copy()
@@ -210,6 +215,10 @@ def add_reject_status_columns(reject_records, reason):
 
 
 def send_back_to_redcap(df, redcap_api_url, redcap_api_key):
+    """
+    This is used to send back rejected records to REDCap and update their
+    integration status columns.
+    """
     logger.info(f"Sending {len(df.index)} records back to REDCap.")
     redcap_project = redcap.Project(redcap_api_url, redcap_api_key)
     response = redcap_project.import_records(

@@ -244,15 +244,7 @@ def test_select_records_by_cdms_matches():
         },
         index=[1, 3],
     )
-    expected_not_matching_df = pd.DataFrame(
-        {
-            "record_id": ["2"],
-            "cdms_id": ["2222"],
-            "dob": ["1953-03-17"],
-            "other_stuff": ["more"],
-        },
-        index=[2],
-    )
+    expected_not_matching_df = pd.DataFrame({"record_id": ["2"]}, index=[2])
     matching_ids = [{external_id_col: "1111"}, {external_id_col: "3333"}]
     matching_records, unmatching_records = select_records_by_cdms_matches(
         input_df,
@@ -267,23 +259,12 @@ def test_select_records_by_cdms_matches():
 def test_add_reject_status_columns():
     dob_field = "dob"
     external_id_col = "cdms_id"
-    input_df = pd.DataFrame(
-        {
-            "record_id": ["1", "2", "3"],
-            "cdms_id": ["1111", "2222", "3333"],
-            "dob": ["2001-01-01", "1953-03-17", "1933-02-04"],
-            "other_stuff": ["some", "more", "values"],
-        },
-        index=[1, 2, 3],
-    )
+    input_df = pd.DataFrame({"record_id": ["1", "2", "3"]}, index=[1, 2, 3])
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     reason = f"mismatched {dob_field} and {external_id_col}"
     expected_output_df = pd.DataFrame(
         {
             "record_id": ["1", "2", "3"],
-            "cdms_id": ["1111", "2222", "3333"],
-            "dob": ["2001-01-01", "1953-03-17", "1933-02-04"],
-            "other_stuff": ["some", "more", "values"],
             "integration_status": ["rejected_person" for i in range(3)],
             "integration_status_timestamp": [timestamp for i in range(3)],
             "integration_status_reason": [reason for i in range(3)],
@@ -315,6 +296,7 @@ def test_handle_cdms_matching():
         index=[1, 2, 3],
     )
 
+    # Expect handle_cdms_matching to return the matching records.
     expected_matched_cdms_ids = [{"cdms_id": "2222"}]
     expected_output_df = pd.DataFrame(
         {
@@ -326,6 +308,8 @@ def test_handle_cdms_matching():
         },
         index=[2],
     )
+
+    # Expect send_back_to_redcap to be called with the following data.
     expected_error_status_columns = {
         REDCAP_INTEGRATION_STATUS: [REDCAP_REJECTED_PERSON for i in range(2)],
         REDCAP_INTEGRATION_STATUS_TIMESTAMP: [
@@ -336,21 +320,8 @@ def test_handle_cdms_matching():
         ],
     }
     expected_unmatched_records = pd.DataFrame(
-        {
-            "record_id": ["1", "3"],
-            "cdms_id": ["1111", "3333"],
-            "dob": [None, "1933-02-04"],
-            "other_stuff": ["some", "values"],
-            **expected_error_status_columns,
-        },
-        index=[1, 3],
+        {"record_id": ["1", "3"], **expected_error_status_columns}, index=[1, 3]
     )
-    # Should drop NA on DOB,
-    # match records in CDMS
-    # split records by matches / non-matches
-    # add error columns to rejects
-    # send rejects back to REDCap
-    # return the matching df.
 
     with patch(
         "cc_utilities.redcap_sync.get_matching_cdms_patients",
@@ -369,6 +340,7 @@ def test_handle_cdms_matching():
             )
 
     mock_get_matching_cdms_patients.assert_called_once()
+    mock_send_back_to_redcap.assert_called_once()
     pd.testing.assert_frame_equal(
         mock_send_back_to_redcap.call_args[0][0], expected_unmatched_records
     )

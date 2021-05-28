@@ -69,6 +69,7 @@ COMMCARE_DEFAULT_CONTACT_KEY_VALUES = {
 # When syncing REDCap to CommCare and some REDCap records are rejected,
 # the following defines the integration status columns and values that must be
 # sent to REDCap for rejected records so they can be reviewed by a human.
+REDCAP_RECORD_ID = "record_id"
 REDCAP_REJECTED_PERSON = "rejected_person"
 REDCAP_INTEGRATION_STATUS = "integration_status"
 REDCAP_INTEGRATION_STATUS_TIMESTAMP = "integration_status_timestamp"
