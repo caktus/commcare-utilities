@@ -5,6 +5,7 @@ from datetime import datetime
 import redcap
 import yaml
 
+from cc_utilities.constants import REDCAP_INTEGRATION_STATUS
 from cc_utilities.logger import logger
 from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
@@ -101,6 +102,8 @@ def main_with_args(
                 # uploaded to CommCare.
                 "dtype": str,
             },
+            # Only retrieve records which have not already synced (either rejected or success)
+            filter_logic=f"[{REDCAP_INTEGRATION_STATUS}] = ''",
         )
         if len(redcap_records.index) == 0:
             logger.info("No records returned from REDCap; aborting sync.")
