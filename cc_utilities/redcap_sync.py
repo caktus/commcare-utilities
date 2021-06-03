@@ -6,10 +6,15 @@ import pandas as pd
 import redcap
 from sqlalchemy import create_engine
 
-from .common import upload_data_to_commcare
+from .common import (
+    get_commcare_cases_by_external_id_with_backoff,
+    upload_data_to_commcare,
+)
 from .constants import (
+    ACCEPTED_INTERVIEW_DISPOSITION_VALUES,
     DOB_FIELD,
     EXTERNAL_ID,
+    INTERVIEW_DISPOSITION,
     REDCAP_HOUSING_1_FIELD,
     REDCAP_HOUSING_2_FIELD,
     REDCAP_HOUSING_FIELD,
@@ -291,6 +296,66 @@ def handle_cdms_matching(df, db_url, external_id_col, redcap_api_url, redcap_api
             redcap_api_url=redcap_api_url,
             redcap_api_key=redcap_api_key,
         )
+    return accept_records
+
+
+def get_commcare_cases_with_acceptable_interview_dispositions(
+    df, external_id_col, cc_api_key, cc_user_name, project_slug
+):
+    """
+    Look up existing cases in CommCare and compare with accepted interview_disposition
+    values. This should allow us to filter out cases which have already been filled
+    out by a case investigator so that patient surveys do not override case
+    investigator's data. We will reject the cases not matching and send
+    them back to REDCap, and otherwise continue to send them to CommCare.
+    """
+    accepted_external_ids = []
+    external_ids = df[external_id_col].to_list()
+    for ext_id in external_ids:
+        cases = get_commcare_cases_by_external_id_with_backoff(
+            project_slug, cc_user_name, cc_api_key, external_id=ext_id
+        )
+        if cases:
+            case_properties = cases[0].get("properties")
+            interview_disposition = case_properties.get(INTERVIEW_DISPOSITION)
+            if interview_disposition in ACCEPTED_INTERVIEW_DISPOSITION_VALUES:
+                accepted_external_ids.append(ext_id)
+    return accepted_external_ids
+
+
+def reject_records_already_filled_out_by_case_investigator(
+    df,
+    external_id_col,
+    project_slug,
+    cc_user_name,
+    cc_api_key,
+    redcap_api_url,
+    redcap_api_key,
+):
+    """
+    Look up records in CommCare and determine if they are OK to push based on
+    logic that determines whether they have already been filled out by
+    a Case Investigator.
+    Reject any records not matched and send back to REDCap to update the integration
+    status to be reviewed by a human.
+    Returns a DataFrame of records that may continue being synced to CommCare.
+    """
+    logger.info("Checking for records already filled out by a Case Investigator...")
+    accepted_external_ids = get_commcare_cases_with_acceptable_interview_dispositions(
+        df, external_id_col, cc_api_key, cc_user_name, project_slug
+    )
+    accept_records, reject_records = split_records_by_accepted_external_ids(
+        df, accepted_external_ids, external_id_col
+    )
+    if len(reject_records) > 0:
+        reject_records = reject_records[[REDCAP_RECORD_ID]]
+        reject_records = add_integration_status_columns(
+            reject_records,
+            status=REDCAP_REJECTED_PERSON,
+            reason="Case already submitted by a Case Investigator.",
+        )
+        import_records_to_redcap(reject_records, redcap_api_url, redcap_api_key)
+    logger.info("Done.")
     return accept_records
 
 

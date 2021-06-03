@@ -1,5 +1,6 @@
 import re
 import time
+from math import log2
 from urllib.parse import urljoin
 
 import pandas as pd
@@ -7,6 +8,7 @@ import requests
 from openpyxl import Workbook
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+from retry import retry
 
 from .constants import (
     APPLICATION_STRUCTURE_DEFAULT_TIMEOUT,
@@ -17,11 +19,18 @@ from .constants import (
 )
 from .logger import logger
 
+MAX_RETRY_DELAY = 512
+
 
 class CommCareUtilitiesError(Exception):
     def __init__(self, message, info):
         super(CommCareUtilitiesError, self).__init__(message)
         self.info = info
+
+
+class NoCommCareCasesReturned(Exception):
+    def __init__(self, message):
+        super(NoCommCareCasesReturned, self).__init__(message)
 
 
 def get_application_structure(
@@ -125,7 +134,7 @@ def get_commcare_cases(
     headers = {
         "Authorization": f"ApiKey {cc_username}:{cc_api_key}",
     }
-    response = requests.get(url, headers=headers, params=data)
+    response = requests.get(url, headers=headers, params=data, timeout=request_timeout)
     if not response.ok:
         message = "Something went wrong downloading data from CommCare"
         info = {
@@ -289,3 +298,40 @@ def make_commcare_export_sync_xl_wb(mapping):
             # NOTE: Columns F, E are not in the order they appear in Excel (E, F)
             ws[f"F{row_num}"], ws[f"E{row_num}"] = item
     return wb
+
+
+@retry(
+    exceptions=NoCommCareCasesReturned,
+    delay=1,
+    tries=log2(MAX_RETRY_DELAY),
+    max_delay=MAX_RETRY_DELAY,
+    backoff=2,
+    logger=logger,
+)
+def get_commcare_cases_by_external_id_with_backoff(
+    project_slug, cc_user_name, cc_api_key, external_id
+):
+    """Wraps `get_commcare_cases` with retry and backoff behavior
+
+    Attempts to retrieve CommCare cases by `external_id` for a given project space.
+    Used when creating a case and immediately trying to retrieve. Newly created
+    cases are not immediately available for retrieval via the API, and have been
+    observed by the code author to take as long as 4 minutes to appear, though more
+    often they are available within a few seconds.
+
+    Args:
+        project_slug (str): The name of the CommCare project (aka "domain")
+        cc_user_name (str): Valid CommCare username
+        cc_api_key (str): Valid CommCare API key
+        external_id (str): Cases with the specified `external_id` will be retrieved
+
+    Returns:
+        list: A list of comprised of dicts representing a CommCare case
+    """
+    cases = get_commcare_cases(
+        project_slug, cc_user_name, cc_api_key, external_id=external_id
+    )
+    if len(cases) == 0:
+        # raising an exception triggers the retry behavior
+        raise NoCommCareCasesReturned("Expected cases, but none returned yet")
+    return cases

@@ -1,17 +1,16 @@
 import csv
 from functools import partial
-from math import ceil, log2
+from math import ceil
 from urllib.parse import urljoin
 from uuid import uuid4
 
 import dateparser
 import phonenumbers
-from retry import retry
 
 from cc_utilities.common import (
     chunk_list,
     get_commcare_case,
-    get_commcare_cases,
+    get_commcare_cases_by_external_id_with_backoff,
     upload_data_to_commcare,
 )
 from cc_utilities.constants import (
@@ -23,50 +22,12 @@ from cc_utilities.constants import (
 from cc_utilities.logger import logger
 
 MAX_CONTACTS_PER_PARENT_PATIENT = 100
-MAX_RETRY_DELAY = 512
 
 
 class LegacyUploadError(Exception):
     def __init__(self, message, info=None):
         super(LegacyUploadError, self).__init__(message)
         self.info = None
-
-
-@retry(
-    exceptions=LegacyUploadError,
-    delay=1,
-    tries=log2(MAX_RETRY_DELAY),
-    max_delay=MAX_RETRY_DELAY,
-    backoff=2,
-    logger=logger,
-)
-def get_commcare_cases_by_external_id_with_backoff(
-    project_slug, cc_user_name, cc_api_key, external_id
-):
-    """Wraps `get_commcare_cases` with retry and backoff behavior
-
-    Attempts to retrieve CommCare cases by `external_id` for a given project space.
-    Used when creating a case and immediately trying to retrieve. Newly created
-    cases are not immediately available for retrieval via the API, and have been
-    observed by the code author to take as long as 4 minutes to appear, though more
-    often they are available within a few seconds.
-
-    Args:
-        project_slug (str): The name of the CommCare project (aka "domain")
-        cc_user_name (str): Valid CommCare username
-        cc_api_key (str): Valid CommCare API key
-        external_id (str): Cases with the specified `external_id` will be retrieved
-
-    Returns:
-        list: A list of comprised of dicts representing a CommCare case
-    """
-    cases = get_commcare_cases(
-        project_slug, cc_user_name, cc_api_key, external_id=external_id
-    )
-    if len(cases) == 0:
-        # raising an exception triggers the retry behavior
-        raise LegacyUploadError("Expected cases, but none returned yet")
-    return cases
 
 
 def clean_raw_case_data_df(df, data_dict):
@@ -173,7 +134,7 @@ def create_dummy_patient_case_data(external_id):
     """Create data for a dummy patient
 
     When importing legacy contacts into CommCare, a dummy patient id needs to be
-    provided. We inclued an external_id so once created, dummy patients can be
+    provided. We included an external_id so once created, dummy patients can be
     retrieved and their CommCare id can be attached to any contacts we upload. The
     values for `stub`, `name`, and `stub_type` are what CommCare wants to see for
     dummy patients.
