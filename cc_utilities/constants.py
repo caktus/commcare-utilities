@@ -71,13 +71,7 @@ COMMCARE_DEFAULT_CONTACT_KEY_VALUES = {
 # sent to REDCap for rejected records so they can be reviewed by a human.
 REDCAP_RECORD_ID = "record_id"
 REDCAP_REJECTED_PERSON = "rejected_person"
+REDCAP_SENT_TO_COMMCARE = "sent_to_commcare"
 REDCAP_INTEGRATION_STATUS = "integration_status"
 REDCAP_INTEGRATION_STATUS_TIMESTAMP = "integration_status_timestamp"
 REDCAP_INTEGRATION_STATUS_REASON = "integration_status_reason"
-REDCAP_REJECTED_INTEGRATION_STATUS_COLUMNS = {
-    REDCAP_INTEGRATION_STATUS: REDCAP_REJECTED_PERSON,
-    # Timestamp must get populated and be in YYYY-MM-DD HH:MM:DD format
-    REDCAP_INTEGRATION_STATUS_TIMESTAMP: "",
-    # Reason must be populated, is a str with the reason for rejection.
-    REDCAP_INTEGRATION_STATUS_REASON: "",
-}

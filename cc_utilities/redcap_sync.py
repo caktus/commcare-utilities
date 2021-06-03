@@ -13,10 +13,12 @@ from .constants import (
     REDCAP_HOUSING_2_FIELD,
     REDCAP_HOUSING_FIELD,
     REDCAP_HOUSING_OTHER,
+    REDCAP_INTEGRATION_STATUS,
     REDCAP_INTEGRATION_STATUS_REASON,
     REDCAP_INTEGRATION_STATUS_TIMESTAMP,
     REDCAP_RECORD_ID,
-    REDCAP_REJECTED_INTEGRATION_STATUS_COLUMNS,
+    REDCAP_REJECTED_PERSON,
+    REDCAP_SENT_TO_COMMCARE,
 )
 from .legacy_upload import normalize_phone_number
 from .logger import logger
@@ -192,40 +194,58 @@ def select_records_by_cdms_matches(
     return matched_records, unmatched_records
 
 
-def add_reject_status_columns(reject_records, reason):
+def add_integration_status_columns(df, status, reason=""):
     """
-    Add integration status columns with values to indicate rejection of the records,
-    when they were rejected, and a reason so the records can be reviewed by a human.
+    Add integration status columns with values to indicate rejection or success
+    of syncing the records. A reason should be included with rejected records
+    to be reviewed by a human.
+
+    :param df: DataFrame with REDCap record IDs
+    :param status: str, must be either REDCAP_REJECTED_PERSON or REDCAP_SENT_TO_COMMCARE.
+    :param reason: str explaining the integration status reason if being rejected.
     """
-    df = reject_records.copy()
+    df = df.copy()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    status_columns_and_values = REDCAP_REJECTED_INTEGRATION_STATUS_COLUMNS.copy()
-    status_columns_and_values.update(
-        {
-            REDCAP_INTEGRATION_STATUS_TIMESTAMP: timestamp,
-            REDCAP_INTEGRATION_STATUS_REASON: reason,
-        }
-    )
+    status_columns_and_values = {
+        REDCAP_INTEGRATION_STATUS: status,
+        REDCAP_INTEGRATION_STATUS_TIMESTAMP: timestamp,
+    }
+    if reason:
+        status_columns_and_values[REDCAP_INTEGRATION_STATUS_REASON] = reason
     logger.info(
-        f"Adding error data to rejected records: " f"{status_columns_and_values}"
+        f"Adding integration status values to records: " f"{status_columns_and_values}"
     )
     for col_name, value in status_columns_and_values.items():
         df[col_name] = value
     return df
 
 
-def send_back_to_redcap(df, redcap_api_url, redcap_api_key):
+def import_records_to_redcap(df, redcap_api_url, redcap_api_key):
     """
-    This is used to send back rejected records to REDCap and update their
-    integration status columns.
+    This is used to update records in REDCap with integration status.
     """
-    logger.info(f"Sending {len(df.index)} records back to REDCap.")
+    logger.info(f"Updating {len(df.index)} records in REDCap.")
     redcap_project = redcap.Project(redcap_api_url, redcap_api_key)
     response = redcap_project.import_records(
         to_import=df, overwrite="normal",  # Default, ignores blank values.
     )
-    logger.info(f"Done sending back {response.get('count')} REDCap records.")
+    logger.info(f"Done updating {response.get('count')} REDCap records.")
     return response
+
+
+def update_successful_records_in_redcap(
+    complete_records, incomplete_records, redcap_api_url, redcap_api_key
+):
+    """
+    When records are successfully sent to CommCare, update the integration status
+    in REDCap to indicate success.
+    """
+    df = pd.concat([complete_records, incomplete_records])
+    if len(df) > 0:
+        df = df[[REDCAP_RECORD_ID]]
+        df = add_integration_status_columns(df, status=REDCAP_SENT_TO_COMMCARE)
+        response = import_records_to_redcap(df, redcap_api_url, redcap_api_key)
+        return response
 
 
 def handle_cdms_matching(
@@ -237,17 +257,23 @@ def handle_cdms_matching(
     and return the matched records that can be sent off to CommCare.
     """
     # Drop records missing DOB; these will also get sent back to REDCap.
+    logger.info(f"Checking CDMS for DOB and ID matches on {len(df.index)} records.")
     df = df.dropna(subset=[DOB_FIELD])
     matching_ids = get_matching_cdms_patients(df, db_url, external_id_col)
     matched_records, unmatched_records = select_records_by_cdms_matches(
         df, redcap_records, matching_ids, external_id_col
     )
-    unmatched_records = add_reject_status_columns(
-        unmatched_records, reason=f"mismatched {DOB_FIELD} and {external_id_col}"
-    )
-    send_back_to_redcap(
-        unmatched_records, redcap_api_url=redcap_api_url, redcap_api_key=redcap_api_key
-    )
+    if len(unmatched_records) > 0:
+        unmatched_records = add_integration_status_columns(
+            unmatched_records,
+            status=REDCAP_REJECTED_PERSON,
+            reason=f"mismatched {DOB_FIELD} and {external_id_col}",
+        )
+        import_records_to_redcap(
+            unmatched_records,
+            redcap_api_url=redcap_api_url,
+            redcap_api_key=redcap_api_key,
+        )
     return matched_records
 
 

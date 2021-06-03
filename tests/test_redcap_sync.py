@@ -11,7 +11,7 @@ from cc_utilities.constants import (
     REDCAP_REJECTED_PERSON,
 )
 from cc_utilities.redcap_sync import (
-    add_reject_status_columns,
+    add_integration_status_columns,
     collapse_checkbox_columns,
     collapse_housing_fields,
     handle_cdms_matching,
@@ -265,13 +265,15 @@ def test_add_reject_status_columns():
     expected_output_df = pd.DataFrame(
         {
             "record_id": ["1", "2", "3"],
-            "integration_status": ["rejected_person" for i in range(3)],
+            "integration_status": [REDCAP_REJECTED_PERSON for i in range(3)],
             "integration_status_timestamp": [timestamp for i in range(3)],
             "integration_status_reason": [reason for i in range(3)],
         },
         index=[1, 2, 3],
     )
-    output_df = add_reject_status_columns(input_df, reason)
+    output_df = add_integration_status_columns(
+        input_df, status=REDCAP_REJECTED_PERSON, reason=reason
+    )
     pd.testing.assert_frame_equal(expected_output_df, output_df)
 
 
@@ -309,7 +311,7 @@ def test_handle_cdms_matching():
         index=[2],
     )
 
-    # Expect send_back_to_redcap to be called with the following data.
+    # Expect import_records_to_redcap to be called with the following data.
     expected_error_status_columns = {
         REDCAP_INTEGRATION_STATUS: [REDCAP_REJECTED_PERSON for i in range(2)],
         REDCAP_INTEGRATION_STATUS_TIMESTAMP: [
@@ -328,8 +330,8 @@ def test_handle_cdms_matching():
         return_value=expected_matched_cdms_ids,
     ) as mock_get_matching_cdms_patients:
         with patch(
-            "cc_utilities.redcap_sync.send_back_to_redcap"
-        ) as mock_send_back_to_redcap:
+            "cc_utilities.redcap_sync.import_records_to_redcap"
+        ) as mock_import_records_to_redcap:
             output = handle_cdms_matching(
                 input_df,
                 input_redcap_records,
@@ -340,8 +342,8 @@ def test_handle_cdms_matching():
             )
 
     mock_get_matching_cdms_patients.assert_called_once()
-    mock_send_back_to_redcap.assert_called_once()
+    mock_import_records_to_redcap.assert_called_once()
     pd.testing.assert_frame_equal(
-        mock_send_back_to_redcap.call_args[0][0], expected_unmatched_records
+        mock_import_records_to_redcap.call_args[0][0], expected_unmatched_records
     )
     pd.testing.assert_frame_equal(output, expected_output_df)

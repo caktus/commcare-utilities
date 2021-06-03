@@ -14,6 +14,7 @@ from cc_utilities.redcap_sync import (
     normalize_phone_cols,
     set_external_id_column,
     split_complete_and_incomplete_records,
+    update_successful_records_in_redcap,
     upload_complete_records,
     upload_incomplete_records,
 )
@@ -134,6 +135,9 @@ def main_with_args(
                 commcare_api_key,
                 commcare_project_name,
                 commcare_user_name,
+            )
+            update_successful_records_in_redcap(
+                complete_records, incomplete_records, redcap_api_url, redcap_api_key
             )
         state["date_begin"] = next_date_begin
     finally:
