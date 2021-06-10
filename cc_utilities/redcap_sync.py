@@ -132,7 +132,7 @@ def get_matching_cdms_patients(df, db_url, external_id_col, table_name="patient"
     that do not match, to avoid overwriting existing patient records with
     another patient's data.
 
-    returns a list of matching rows, as dictionaries with external_id_col values.
+    Returns a list of matching rows, as dictionaries with external_id_col values.
     """
     # Load table
     engine = create_engine(db_url)
@@ -222,7 +222,7 @@ def add_integration_status_columns(df, status, reason=""):
 
 def import_records_to_redcap(df, redcap_api_url, redcap_api_key):
     """
-    This is used to update records in REDCap with integration status.
+    This is used to update records in REDCap with the integration status.
     """
     logger.info(f"Updating {len(df.index)} records in REDCap.")
     redcap_project = redcap.Project(redcap_api_url, redcap_api_key)
@@ -252,12 +252,12 @@ def handle_cdms_matching(
     df, redcap_records, db_url, external_id_col, redcap_api_url, redcap_api_key
 ):
     """
-    Query the CDMS SQL mirror to match these records by ID and DOB,
+    Query the CommCare SQL mirror to match these records by ID and DOB,
     reject / send any non-matching records back to REDCap with error columns,
     and return the matched records that can be sent off to CommCare.
     """
     # Drop records missing DOB; these will also get sent back to REDCap.
-    logger.info(f"Checking CDMS for DOB and ID matches on {len(df.index)} records.")
+    logger.info(f"Checking CommCare DB mirror for DOB and ID matches on {len(df.index)} records.")
     df = df.dropna(subset=[DOB_FIELD])
     matching_ids = get_matching_cdms_patients(df, db_url, external_id_col)
     matched_records, unmatched_records = select_records_by_cdms_matches(
