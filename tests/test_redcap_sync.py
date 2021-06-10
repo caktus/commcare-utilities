@@ -1,8 +1,9 @@
-from datetime import datetime
+import datetime
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from cc_utilities.constants import (
     REDCAP_INTEGRATION_STATUS,
@@ -22,6 +23,19 @@ from cc_utilities.redcap_sync import (
     upload_complete_records,
     upload_incomplete_records,
 )
+
+FAKE_TIME = datetime.datetime(2020, 3, 14, 15, 9, 26)
+
+
+@pytest.fixture
+def patch_datetime_now(monkeypatch):
+    class mock_datetime:
+        @classmethod
+        def now(cls):
+            return FAKE_TIME
+
+    monkeypatch.setattr(datetime, "datetime", mock_datetime)
+    monkeypatch.setattr("cc_utilities.redcap_sync.datetime", mock_datetime)
 
 
 def test_collapse_checkbox_columns():
@@ -244,7 +258,15 @@ def test_select_records_by_cdms_matches():
         },
         index=[1, 3],
     )
-    expected_not_matching_df = pd.DataFrame({"record_id": ["2"]}, index=[2])
+    expected_not_matching_df = pd.DataFrame(
+        {
+            "record_id": ["2"],
+            "cdms_id": ["2222"],
+            "dob": ["1953-03-17"],
+            "other_stuff": ["more"],
+        },
+        index=[2],
+    )
     matching_ids = [{external_id_col: "1111"}, {external_id_col: "3333"}]
     matching_records, unmatching_records = select_records_by_cdms_matches(
         input_df,
@@ -256,11 +278,11 @@ def test_select_records_by_cdms_matches():
     pd.testing.assert_frame_equal(unmatching_records, expected_not_matching_df)
 
 
-def test_add_reject_status_columns():
+def test_add_reject_status_columns(patch_datetime_now):
     dob_field = "dob"
     external_id_col = "cdms_id"
     input_df = pd.DataFrame({"record_id": ["1", "2", "3"]}, index=[1, 2, 3])
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     reason = f"mismatched {dob_field} and {external_id_col}"
     expected_output_df = pd.DataFrame(
         {
@@ -277,7 +299,7 @@ def test_add_reject_status_columns():
     pd.testing.assert_frame_equal(expected_output_df, output_df)
 
 
-def test_handle_cdms_matching():
+def test_handle_cdms_matching(patch_datetime_now):
     input_df = pd.DataFrame(
         {
             "record_id": ["1", "2", "3"],
@@ -315,7 +337,7 @@ def test_handle_cdms_matching():
     expected_error_status_columns = {
         REDCAP_INTEGRATION_STATUS: [REDCAP_REJECTED_PERSON for i in range(2)],
         REDCAP_INTEGRATION_STATUS_TIMESTAMP: [
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S") for i in range(2)
+            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") for i in range(2)
         ],
         REDCAP_INTEGRATION_STATUS_REASON: [
             "mismatched dob and cdms_id" for i in range(2)
