@@ -183,7 +183,7 @@ def select_records_by_cdms_matches(
     matched_external_ids = [m[external_id_col] for m in matched_external_ids]
     unmatched_records = redcap_records.where(
         ~redcap_records[external_id_col].isin(matched_external_ids)
-    ).dropna(subset=[external_id_col])[[REDCAP_RECORD_ID]]
+    ).dropna(subset=[external_id_col])
     matched_records = df.where(df[external_id_col].isin(matched_external_ids)).dropna(
         subset=[external_id_col]
     )
@@ -257,13 +257,16 @@ def handle_cdms_matching(
     and return the matched records that can be sent off to CommCare.
     """
     # Drop records missing DOB; these will also get sent back to REDCap.
-    logger.info(f"Checking CommCare DB mirror for DOB and ID matches on {len(df.index)} records.")
+    logger.info(
+        f"Checking CommCare DB mirror for DOB and ID matches on {len(df.index)} records."
+    )
     df = df.dropna(subset=[DOB_FIELD])
     matching_ids = get_matching_cdms_patients(df, db_url, external_id_col)
     matched_records, unmatched_records = select_records_by_cdms_matches(
         df, redcap_records, matching_ids, external_id_col
     )
     if len(unmatched_records) > 0:
+        unmatched_records = unmatched_records[[REDCAP_RECORD_ID]]
         unmatched_records = add_integration_status_columns(
             unmatched_records,
             status=REDCAP_REJECTED_PERSON,
