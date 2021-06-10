@@ -121,8 +121,9 @@ def set_external_id_column(df, external_id_col):
     For the given external_id_col, drop any rows with no value and
     copy to a new column named "external_id"
     """
+    df = df.copy()
     df = df.dropna(subset=[external_id_col])
-    df.loc[:, "external_id"] = df[external_id_col]
+    df["external_id"] = df[external_id_col]
     return df
 
 
