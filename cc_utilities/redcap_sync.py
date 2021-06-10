@@ -176,9 +176,6 @@ def select_records_by_cdms_matches(
     """
     Given the subset of external IDs in matched_external_ids,
     return two DataFrames; one with those matched patients and one without.
-    For unmatched patients, select from redcap_records to include records
-    missing external_id or dob, select only the record_id column to avoid
-    updating any data in REDCap that may have changed during this sync.
     """
     matched_external_ids = [m[external_id_col] for m in matched_external_ids]
     unmatched_records = redcap_records.where(
@@ -266,6 +263,8 @@ def handle_cdms_matching(
         df, redcap_records, matching_ids, external_id_col
     )
     if len(unmatched_records) > 0:
+        # Select only the 'record_id' column to identify records in REDCap
+        # and only update the integration status columns added below.
         unmatched_records = unmatched_records[[REDCAP_RECORD_ID]]
         unmatched_records = add_integration_status_columns(
             unmatched_records,
