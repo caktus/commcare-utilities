@@ -4,7 +4,7 @@ from functools import partial
 
 import pandas as pd
 import redcap
-from sqlalchemy import MetaData, Table, and_, create_engine, or_, select
+from sqlalchemy import MetaData, Table, create_engine, select
 
 from .common import upload_data_to_commcare
 from .constants import (
@@ -127,7 +127,9 @@ def set_external_id_column(df, external_id_col):
     return df
 
 
-def get_matching_cdms_patients(df, db_url, external_id_col, table_name="patient"):
+def get_external_ids_and_dobs(
+    external_ids, db_url, external_id_col, table_name="patient"
+):
     """
     Look up records by CDMS ID and DOB. This will be used to reject records
     that do not match, to avoid overwriting existing patient records with
@@ -148,18 +150,12 @@ def get_matching_cdms_patients(df, db_url, external_id_col, table_name="patient"
     ), f"{external_id_col} not in {table_name} table"
 
     # Define the query
-    wheres = []
-    for record in df.itertuples():
-        dob = record.dob
-        external_id = getattr(record, external_id_col)
-        wheres.append(
-            [
-                getattr(table.c, external_id_col) == external_id,
-                getattr(table.c, DOB_FIELD) == dob,
-            ]
-        )
-    query = select([getattr(table.c, external_id_col)]).where(
-        or_(*[and_(*where) for where in wheres])
+    query = select(
+        [getattr(table.c, external_id_col), getattr(table.c, DOB_FIELD)]
+    ).where(
+        getattr(table.c, external_id_col).in_(external_ids),
+        getattr(table.c, DOB_FIELD).isnot(None),
+        getattr(table.c, DOB_FIELD) != "",
     )
 
     # Execute
@@ -171,6 +167,30 @@ def get_matching_cdms_patients(df, db_url, external_id_col, table_name="patient"
         conn.close()
 
 
+def get_records_matching_id_and_dob(
+    df, external_id_col, cdms_patients_data, external_ids
+):
+    """
+    Given the data from the CDMS SQL Mirror with CDMS_IDs and DOBs,
+    accept the record for sync if the DOB from REDCap (in df) matches
+    the DOB in the CDMS data. Also accept the record if a CDMS_ID was not returned
+    from the CDMS mirror.
+
+    Returns a list of external IDs that may continue to be synced to CommCare.
+    """
+    lookup_df = df.set_index(external_id_col)
+    matching_ids_dobs = {d[external_id_col]: d[DOB_FIELD] for d in cdms_patients_data}
+    accepted_external_ids = []
+    for external_id in external_ids:
+        dob = lookup_df[external_id][DOB_FIELD]
+        try:
+            if matching_ids_dobs[external_id] == dob:
+                accepted_external_ids.append(external_id)
+        except KeyError:
+            accepted_external_ids.append(external_id)
+    return accepted_external_ids
+
+
 def select_records_by_cdms_matches(
     df, redcap_records, matched_external_ids, external_id_col
 ):
@@ -178,7 +198,6 @@ def select_records_by_cdms_matches(
     Given the subset of external IDs in matched_external_ids,
     return two DataFrames; one with those matched patients and one without.
     """
-    matched_external_ids = [m[external_id_col] for m in matched_external_ids]
     unmatched_records = redcap_records.where(
         ~redcap_records[external_id_col].isin(matched_external_ids)
     ).dropna(subset=[external_id_col])
@@ -259,7 +278,11 @@ def handle_cdms_matching(
         f"Checking CommCare DB mirror for DOB and ID matches on {len(df.index)} records."
     )
     df = df.dropna(subset=[DOB_FIELD])
-    matching_ids = get_matching_cdms_patients(df, db_url, external_id_col)
+    external_ids = df["external_id"].tolist()
+    cdms_patients_data = get_external_ids_and_dobs(df, db_url, external_id_col)
+    matching_ids = get_records_matching_id_and_dob(
+        df, external_id_col, cdms_patients_data, external_ids
+    )
     matched_records, unmatched_records = select_records_by_cdms_matches(
         df, redcap_records, matching_ids, external_id_col
     )

@@ -267,7 +267,7 @@ def test_select_records_by_cdms_matches():
         },
         index=[2],
     )
-    matching_ids = [{external_id_col: "1111"}, {external_id_col: "3333"}]
+    matching_ids = ["1111", "3333"]
     matching_records, unmatching_records = select_records_by_cdms_matches(
         input_df,
         input_redcap_records,
@@ -321,7 +321,7 @@ def test_handle_cdms_matching(patch_datetime_now):
     )
 
     # Expect handle_cdms_matching to return the matching records.
-    expected_matched_cdms_ids = [{"cdms_id": "2222"}]
+    expected_matched_cdms_ids = ["2222"]
     expected_output_df = pd.DataFrame(
         {
             "record_id": ["2"],
@@ -348,22 +348,26 @@ def test_handle_cdms_matching(patch_datetime_now):
     )
 
     with patch(
-        "cc_utilities.redcap_sync.get_matching_cdms_patients",
-        return_value=expected_matched_cdms_ids,
-    ) as mock_get_matching_cdms_patients:
+        "cc_utilities.redcap_sync.get_external_ids_and_dobs",
+    ) as mock_get_external_ids_and_dobs:
         with patch(
             "cc_utilities.redcap_sync.import_records_to_redcap"
         ) as mock_import_records_to_redcap:
-            output = handle_cdms_matching(
-                input_df,
-                input_redcap_records,
-                db_url="test",
-                external_id_col="cdms_id",
-                redcap_api_url="test",
-                redcap_api_key="test",
-            )
+            with patch(
+                "cc_utilities.redcap_sync.get_records_matching_id_and_dob",
+                return_value=expected_matched_cdms_ids,
+            ) as mock_get_records_matching_id_and_dob:
+                output = handle_cdms_matching(
+                    input_df,
+                    input_redcap_records,
+                    db_url="test",
+                    external_id_col="cdms_id",
+                    redcap_api_url="test",
+                    redcap_api_key="test",
+                )
 
-    mock_get_matching_cdms_patients.assert_called_once()
+    mock_get_external_ids_and_dobs.assert_called_once()
+    mock_get_records_matching_id_and_dob.assert_called_once()
     mock_import_records_to_redcap.assert_called_once()
     pd.testing.assert_frame_equal(
         mock_import_records_to_redcap.call_args[0][0], expected_unmatched_records
