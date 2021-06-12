@@ -182,7 +182,7 @@ def get_records_matching_id_and_dob(
     matching_ids_dobs = {d[external_id_col]: d[DOB_FIELD] for d in cdms_patients_data}
     accepted_external_ids = []
     for external_id in external_ids:
-        dob = lookup_df[external_id][DOB_FIELD]
+        dob = lookup_df.loc[external_id][DOB_FIELD]
         try:
             if matching_ids_dobs[external_id] == dob:
                 accepted_external_ids.append(external_id)

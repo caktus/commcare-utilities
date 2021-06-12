@@ -15,6 +15,7 @@ from cc_utilities.redcap_sync import (
     add_integration_status_columns,
     collapse_checkbox_columns,
     collapse_housing_fields,
+    get_records_matching_id_and_dob,
     handle_cdms_matching,
     normalize_phone_cols,
     select_records_by_cdms_matches,
@@ -220,6 +221,32 @@ def test_collapse_housing_fields():
     )
     output_df = collapse_housing_fields(input_df)
     pd.testing.assert_frame_equal(expected_output_df, output_df)
+
+
+def test_get_records_matching_id_and_dob():
+    external_id_col = "cdms_id"
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3"],
+            "cdms_id": ["1111", "2222", "3333"],
+            "dob": ["1978-10-01", "1953-03-17", "1933-02-04"],
+            "other_stuff": ["some", "more", "values"],
+        },
+        index=[1, 2, 3],
+    )
+    external_ids = input_df[external_id_col].tolist()
+    cdms_patients_data = [
+        {"cdms_id": "1111", "dob": "1978-10-01"},
+        {"cdms_id": "2222", "dob": "1990-11-08"},
+    ]
+    expected_accepted_external_ids = ["1111", "3333"]
+    accepted_external_ids = get_records_matching_id_and_dob(
+        df=input_df,
+        external_id_col=external_id_col,
+        cdms_patients_data=cdms_patients_data,
+        external_ids=external_ids,
+    )
+    assert expected_accepted_external_ids == accepted_external_ids
 
 
 def test_select_records_by_cdms_matches():
