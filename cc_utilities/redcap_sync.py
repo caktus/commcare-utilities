@@ -173,8 +173,7 @@ def get_records_matching_id_and_dob(
     """
     Given the data from the CDMS SQL Mirror with CDMS_IDs and DOBs,
     accept the record for sync if the DOB from REDCap (in df) matches
-    the DOB in the CDMS data. Also accept the record if a CDMS_ID was not returned
-    from the CDMS mirror.
+    the DOB in the CDMS data. Reject records not returned from the SQL mirror.
 
     Returns a list of external IDs that may continue to be synced to CommCare.
     """
@@ -183,10 +182,7 @@ def get_records_matching_id_and_dob(
     accepted_external_ids = []
     for external_id in external_ids:
         dob = lookup_df.loc[external_id][DOB_FIELD]
-        try:
-            if matching_ids_dobs[external_id] == dob:
-                accepted_external_ids.append(external_id)
-        except KeyError:
+        if matching_ids_dobs.get(external_id) == dob:
             accepted_external_ids.append(external_id)
     return accepted_external_ids
 

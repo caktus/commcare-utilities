@@ -239,7 +239,7 @@ def test_get_records_matching_id_and_dob():
         {"cdms_id": "1111", "dob": "1978-10-01"},
         {"cdms_id": "2222", "dob": "1990-11-08"},
     ]
-    expected_accepted_external_ids = ["1111", "3333"]
+    expected_accepted_external_ids = ["1111"]
     accepted_external_ids = get_records_matching_id_and_dob(
         df=input_df,
         external_id_col=external_id_col,
