@@ -104,7 +104,11 @@ def main_with_args(
                 "dtype": str,
             },
             # Only retrieve records which have not already synced (either rejected or success)
-            filter_logic=f"[{REDCAP_INTEGRATION_STATUS}] = ''",
+            filter_logic=" AND ".join([
+                f"[{REDCAP_INTEGRATION_STATUS}] = ''",
+                "[ci_survey_complete] = 2",
+                "[cdms_id] != ''",
+            ])
         )
         if len(redcap_records.index) == 0:
             logger.info("No records returned from REDCap; aborting sync.")
