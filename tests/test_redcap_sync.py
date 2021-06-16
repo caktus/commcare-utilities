@@ -326,7 +326,22 @@ def test_add_reject_status_columns(patch_datetime_now):
     pd.testing.assert_frame_equal(expected_output_df, output_df)
 
 
-def test_handle_cdms_matching(patch_datetime_now):
+@patch("cc_utilities.redcap_sync.get_records_matching_id_and_dob")
+@patch("cc_utilities.redcap_sync.import_records_to_redcap")
+@patch("cc_utilities.redcap_sync.get_external_ids_and_dobs")
+def test_handle_cdms_matching(
+    mock_get_external_ids_and_dobs,
+    mock_import_records_to_redcap,
+    mock_get_records_matching_id_and_dob,
+    patch_datetime_now,
+):
+    """
+    Given the list of external IDs returned after comparing
+    CDMS IDs and DOBs, assert that handle_cdms_matching properly
+    handles accepted and rejected records; sending the rejected
+    records back to redcap with record_ids and integration status,
+    and returns the accepted records.
+    """
     input_df = pd.DataFrame(
         {
             "record_id": ["1", "2", "3"],
@@ -360,7 +375,7 @@ def test_handle_cdms_matching(patch_datetime_now):
         index=[2],
     )
 
-    # Expect import_records_to_redcap to be called with the following data.
+    # Expect import_records_to_redcap to be called with integration status data.
     expected_error_status_columns = {
         REDCAP_INTEGRATION_STATUS: [REDCAP_REJECTED_PERSON for i in range(2)],
         REDCAP_INTEGRATION_STATUS_TIMESTAMP: [
@@ -374,24 +389,15 @@ def test_handle_cdms_matching(patch_datetime_now):
         {"record_id": ["1", "3"], **expected_error_status_columns}, index=[1, 3]
     )
 
-    with patch(
-        "cc_utilities.redcap_sync.get_external_ids_and_dobs",
-    ) as mock_get_external_ids_and_dobs:
-        with patch(
-            "cc_utilities.redcap_sync.import_records_to_redcap"
-        ) as mock_import_records_to_redcap:
-            with patch(
-                "cc_utilities.redcap_sync.get_records_matching_id_and_dob",
-                return_value=expected_matched_cdms_ids,
-            ) as mock_get_records_matching_id_and_dob:
-                output = handle_cdms_matching(
-                    input_df,
-                    input_redcap_records,
-                    db_url="test",
-                    external_id_col="cdms_id",
-                    redcap_api_url="test",
-                    redcap_api_key="test",
-                )
+    mock_get_records_matching_id_and_dob.return_value = expected_matched_cdms_ids
+    output = handle_cdms_matching(
+        input_df,
+        input_redcap_records,
+        db_url="test",
+        external_id_col="cdms_id",
+        redcap_api_url="test",
+        redcap_api_key="test",
+    )
 
     mock_get_external_ids_and_dobs.assert_called_once()
     mock_get_records_matching_id_and_dob.assert_called_once()

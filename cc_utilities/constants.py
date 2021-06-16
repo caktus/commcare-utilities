@@ -75,3 +75,5 @@ REDCAP_SENT_TO_COMMCARE = "sent_to_commcare"
 REDCAP_INTEGRATION_STATUS = "integration_status"
 REDCAP_INTEGRATION_STATUS_TIMESTAMP = "integration_status_timestamp"
 REDCAP_INTEGRATION_STATUS_REASON = "integration_status_reason"
+
+EXTERNAL_ID = "external_id"

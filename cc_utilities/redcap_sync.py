@@ -4,11 +4,12 @@ from functools import partial
 
 import pandas as pd
 import redcap
-from sqlalchemy import MetaData, Table, create_engine, select
+from sqlalchemy import create_engine
 
 from .common import upload_data_to_commcare
 from .constants import (
     DOB_FIELD,
+    EXTERNAL_ID,
     REDCAP_HOUSING_1_FIELD,
     REDCAP_HOUSING_2_FIELD,
     REDCAP_HOUSING_FIELD,
@@ -123,7 +124,7 @@ def set_external_id_column(df, external_id_col):
     """
     df = df.copy()
     df = df.dropna(subset=[external_id_col])
-    df["external_id"] = df[external_id_col]
+    df[EXTERNAL_ID] = df[external_id_col]
     return df
 
 
@@ -137,34 +138,20 @@ def get_external_ids_and_dobs(
 
     Returns a list of matching rows, as dictionaries with external_id_col values.
     """
-    # Load table
-    engine = create_engine(db_url)
-    meta = MetaData(bind=engine)
-    table = Table(table_name, meta, autoload=True, autoload_with=engine)
-
-    # Validate columns
-    column_names = [col.name for col in table.columns]
-    assert DOB_FIELD in column_names, f"{DOB_FIELD} not in {table_name} table"
-    assert (
-        external_id_col in column_names
-    ), f"{external_id_col} not in {table_name} table"
-
-    # Define the query
-    query = select(
-        [getattr(table.c, external_id_col), getattr(table.c, DOB_FIELD)]
-    ).where(
-        getattr(table.c, external_id_col).in_(external_ids),
-        getattr(table.c, DOB_FIELD).isnot(None),
-        getattr(table.c, DOB_FIELD) != "",
-    )
-
-    # Execute
-    conn = engine.connect()
-    try:
-        result = conn.execute(query)
-        return [dict(row) for row in result.fetchall()]
-    finally:
-        conn.close()
+    cdms_patients_data = pd.read_sql(
+        f"""SELECT
+                {external_id_col},
+                {DOB_FIELD}
+            FROM {table_name}
+            WHERE
+                {external_id_col} IN %(external_ids)s
+                AND {DOB_FIELD} IS NOT NULL
+                AND {DOB_FIELD} <> ''
+        """,
+        create_engine(db_url),
+        params={"external_ids": tuple(external_ids)},
+    ).to_dict(orient="records")
+    return cdms_patients_data
 
 
 def get_records_matching_id_and_dob(
@@ -274,8 +261,10 @@ def handle_cdms_matching(
         f"Checking CommCare DB mirror for DOB and ID matches on {len(df.index)} records."
     )
     df = df.dropna(subset=[DOB_FIELD])
-    external_ids = df["external_id"].tolist()
-    cdms_patients_data = get_external_ids_and_dobs(df, db_url, external_id_col)
+    external_ids = df[EXTERNAL_ID].tolist()
+    cdms_patients_data = get_external_ids_and_dobs(
+        external_ids, db_url, external_id_col
+    )
     matching_ids = get_records_matching_id_and_dob(
         df, external_id_col, cdms_patients_data, external_ids
     )
@@ -326,11 +315,11 @@ def upload_complete_records(
             complete_records,
             commcare_project_name,
             "patient",
-            "external_id",
+            EXTERNAL_ID,
             commcare_user_name,
             commcare_api_key,
             create_new_cases="off",
-            search_field="external_id",
+            search_field=EXTERNAL_ID,
         )
 
 
@@ -357,9 +346,9 @@ def upload_incomplete_records(
             data,
             commcare_project_name,
             "patient",
-            "external_id",
+            EXTERNAL_ID,
             commcare_user_name,
             commcare_api_key,
             create_new_cases="off",
-            search_field="external_id",
+            search_field=EXTERNAL_ID,
         )
