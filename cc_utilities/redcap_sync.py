@@ -128,16 +128,18 @@ def set_external_id_column(df, external_id_col):
     return df
 
 
-def get_external_ids_and_dobs(
-    external_ids, db_url, external_id_col, table_name="patient"
+def query_cdms_for_external_ids_and_dobs(
+    df, db_url, external_id_col, table_name="patient"
 ):
     """
-    Look up records by CDMS ID and DOB. This will be used to reject records
-    that do not match, to avoid overwriting existing patient records with
+    Look up records in the SQL Mirror and get CDMS ID and DOB.
+    This will be used to reject records that do not match,
+    to avoid overwriting existing patient records with
     another patient's data.
 
     Returns a list of matching rows, as dictionaries with external_id_col values.
     """
+    external_ids = df[EXTERNAL_ID].tolist()
     cdms_patients_data = pd.read_sql(
         f"""SELECT
                 {external_id_col},
@@ -154,44 +156,53 @@ def get_external_ids_and_dobs(
     return cdms_patients_data
 
 
-def get_records_matching_id_and_dob(
-    df, external_id_col, cdms_patients_data, external_ids
-):
+def drop_external_ids_not_in_cdms(df, external_id_col, cdms_patients_data):
     """
-    Given the data from the CDMS SQL Mirror with CDMS_IDs and DOBs,
-    accept the record for sync if the DOB from REDCap (in df) matches
-    the DOB in the CDMS data. Reject records not returned from the SQL mirror.
+    If a CDMS ID was not returned by the SQL Mirror, ignore it so that
+    we can sync it if it does ever come around in future syncs.
+
+    Returns a DataFrame minus records not in external_ids.
+    """
+    external_ids = [d[external_id_col] for d in cdms_patients_data]
+    df = df.where(df[external_id_col].isin(external_ids)).dropna(
+        subset=[external_id_col]
+    )
+    return df
+
+
+def get_records_matching_dob(df, external_id_col, cdms_patients_data):
+    """
+    Accept records where the DOB from REDCap (in df) matches
+    the DOB in the CDMS patients data.
 
     Returns a list of external IDs that may continue to be synced to CommCare.
     """
     lookup_df = df.set_index(external_id_col)
     matching_ids_dobs = {d[external_id_col]: d[DOB_FIELD] for d in cdms_patients_data}
     accepted_external_ids = []
-    for external_id in external_ids:
-        dob = lookup_df.loc[external_id][DOB_FIELD]
-        if matching_ids_dobs.get(external_id) == dob:
+    for external_id, cdms_dob in matching_ids_dobs.items():
+        redcap_dob = lookup_df.loc[external_id][DOB_FIELD]
+        if redcap_dob == cdms_dob:
             accepted_external_ids.append(external_id)
     return accepted_external_ids
 
 
-def select_records_by_cdms_matches(
-    df, redcap_records, matched_external_ids, external_id_col
-):
+def split_records_by_accepted_external_ids(df, accepted_external_ids, external_id_col):
     """
-    Given the subset of external IDs in matched_external_ids,
-    return two DataFrames; one with those matched patients and one without.
+    Given the subset of external IDs in accepted_external_ids,
+    return two DataFrames; one with these IDs and one without.
     """
-    unmatched_records = redcap_records.where(
-        ~redcap_records[external_id_col].isin(matched_external_ids)
-    ).dropna(subset=[external_id_col])
-    matched_records = df.where(df[external_id_col].isin(matched_external_ids)).dropna(
+    reject_records = df.where(~df[external_id_col].isin(accepted_external_ids)).dropna(
+        subset=[external_id_col]
+    )
+    accept_records = df.where(df[external_id_col].isin(accepted_external_ids)).dropna(
         subset=[external_id_col]
     )
     logger.info(
-        f"{len(matched_records.index)} were matched in CDMS by DOB and CDMS ID, "
-        f"and {len(unmatched_records.index)} records were not found."
+        f"{len(accept_records.index)} were matched in CDMS by DOB and CDMS ID, "
+        f"and {len(reject_records.index)} records were not found."
     )
-    return matched_records, unmatched_records
+    return accept_records, reject_records
 
 
 def add_integration_status_columns(df, status, reason=""):
@@ -248,44 +259,39 @@ def update_successful_records_in_redcap(
         return response
 
 
-def handle_cdms_matching(
-    df, redcap_records, db_url, external_id_col, redcap_api_url, redcap_api_key
-):
+def handle_cdms_matching(df, db_url, external_id_col, redcap_api_url, redcap_api_key):
     """
     Query the CommCare SQL mirror to match these records by ID and DOB,
-    reject / send any non-matching records back to REDCap with error columns,
-    and return the matched records that can be sent off to CommCare.
+    reject / send any non-matching records back to REDCap with integration
+    status columns, and return a DataFrame of accepted records that can be
+    sent to CommCare.
     """
-    # Drop records missing DOB; these will also get sent back to REDCap.
     logger.info(
         f"Checking CommCare DB mirror for DOB and ID matches on {len(df.index)} records."
     )
-    df = df.dropna(subset=[DOB_FIELD])
-    external_ids = df[EXTERNAL_ID].tolist()
-    cdms_patients_data = get_external_ids_and_dobs(
-        external_ids, db_url, external_id_col
+    cdms_patients_data = query_cdms_for_external_ids_and_dobs(
+        df, db_url, external_id_col
     )
-    matching_ids = get_records_matching_id_and_dob(
-        df, external_id_col, cdms_patients_data, external_ids
+    df = drop_external_ids_not_in_cdms(df, external_id_col, cdms_patients_data)
+    matching_ids = get_records_matching_dob(df, external_id_col, cdms_patients_data)
+    accept_records, reject_records = split_records_by_accepted_external_ids(
+        df, matching_ids, external_id_col
     )
-    matched_records, unmatched_records = select_records_by_cdms_matches(
-        df, redcap_records, matching_ids, external_id_col
-    )
-    if len(unmatched_records) > 0:
+    if len(reject_records) > 0:
         # Select only the 'record_id' column to identify records in REDCap
         # and only update the integration status columns added below.
-        unmatched_records = unmatched_records[[REDCAP_RECORD_ID]]
-        unmatched_records = add_integration_status_columns(
-            unmatched_records,
+        reject_records = reject_records[[REDCAP_RECORD_ID]]
+        reject_records = add_integration_status_columns(
+            reject_records,
             status=REDCAP_REJECTED_PERSON,
             reason=f"mismatched {DOB_FIELD} and {external_id_col}",
         )
         import_records_to_redcap(
-            unmatched_records,
+            reject_records,
             redcap_api_url=redcap_api_url,
             redcap_api_key=redcap_api_key,
         )
-    return matched_records
+    return accept_records
 
 
 def split_complete_and_incomplete_records(df):

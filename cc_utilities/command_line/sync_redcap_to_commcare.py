@@ -123,7 +123,6 @@ def main_with_args(
                 .pipe(set_external_id_column, external_id_col)
                 .pipe(
                     handle_cdms_matching,
-                    redcap_records,
                     db_url,
                     external_id_col,
                     redcap_api_url,
