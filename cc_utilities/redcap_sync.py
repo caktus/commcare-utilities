@@ -312,6 +312,9 @@ def get_commcare_cases_with_acceptable_interview_dispositions(
     accepted_external_ids = []
     external_ids = df[external_id_col].to_list()
     for ext_id in external_ids:
+        # Get cases in CommCare to compare interview_disposition.
+        # Querying CDMS would be a favorable source of truth for this, but did
+        # not seem to have this column available at the time of implementing this.
         cases = get_commcare_cases_by_external_id_with_backoff(
             project_slug, cc_user_name, cc_api_key, external_id=ext_id
         )
