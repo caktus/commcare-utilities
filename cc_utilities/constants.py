@@ -9,6 +9,7 @@ COMMCARE_UPLOAD_STATES = dict(missing=-1, not_started=0, started=1, success=2, f
 COMMCARE_UNSET_CAN_SMS_LABEL = "pending"
 COMMCARE_CANNOT_SMS_LABEL = "no"
 COMMCARE_CAN_SMS_LABEL = "yes"
+DOB_FIELD = "dob"
 REDCAP_HOUSING_1_FIELD = "housing_1"
 REDCAP_HOUSING_2_FIELD = "housing_2"
 REDCAP_HOUSING_FIELD = "housing"
@@ -64,3 +65,15 @@ COMMCARE_DEFAULT_CONTACT_KEY_VALUES = {
     "parent_relationship_type": "extension",
     "parent_identifier": "parent",
 }
+
+# When syncing REDCap to CommCare and some REDCap records are rejected,
+# the following define the integration status columns and values that must be
+# updated in REDCap for records that are rejected or successfully synced.
+REDCAP_RECORD_ID = "record_id"
+REDCAP_REJECTED_PERSON = "rejected_person"
+REDCAP_SENT_TO_COMMCARE = "sent_to_commcare"
+REDCAP_INTEGRATION_STATUS = "integration_status"
+REDCAP_INTEGRATION_STATUS_TIMESTAMP = "integration_status_timestamp"
+REDCAP_INTEGRATION_STATUS_REASON = "integration_status_reason"
+
+EXTERNAL_ID = "external_id"

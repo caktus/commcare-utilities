@@ -1,14 +1,25 @@
 from collections import defaultdict
+from datetime import datetime
 from functools import partial
 
 import pandas as pd
+import redcap
+from sqlalchemy import create_engine
 
 from .common import upload_data_to_commcare
 from .constants import (
+    DOB_FIELD,
+    EXTERNAL_ID,
     REDCAP_HOUSING_1_FIELD,
     REDCAP_HOUSING_2_FIELD,
     REDCAP_HOUSING_FIELD,
     REDCAP_HOUSING_OTHER,
+    REDCAP_INTEGRATION_STATUS,
+    REDCAP_INTEGRATION_STATUS_REASON,
+    REDCAP_INTEGRATION_STATUS_TIMESTAMP,
+    REDCAP_RECORD_ID,
+    REDCAP_REJECTED_PERSON,
+    REDCAP_SENT_TO_COMMCARE,
 )
 from .legacy_upload import normalize_phone_number
 from .logger import logger
@@ -111,22 +122,189 @@ def set_external_id_column(df, external_id_col):
     For the given external_id_col, drop any rows with no value and
     copy to a new column named "external_id"
     """
+    df = df.copy()
     df = df.dropna(subset=[external_id_col])
-    df.loc[:, "external_id"] = df[external_id_col]
+    df[EXTERNAL_ID] = df[external_id_col]
     return df
 
 
-def split_complete_and_incomplete_records(cases_df):
+def query_cdms_for_external_ids_and_dobs(
+    df, db_url, external_id_col, table_name="patient"
+):
+    """
+    Look up records in the SQL Mirror and get CDMS ID and DOB.
+    This will be used to reject records that do not match,
+    to avoid overwriting existing patient records with
+    another patient's data.
+
+    Returns a list of matching rows, as dictionaries with external_id_col values.
+    """
+    external_ids = df[EXTERNAL_ID].tolist()
+    cdms_patients_data = pd.read_sql(
+        f"""SELECT
+                {external_id_col},
+                {DOB_FIELD}
+            FROM {table_name}
+            WHERE
+                {external_id_col} IN %(external_ids)s
+                AND {DOB_FIELD} IS NOT NULL
+                AND {DOB_FIELD} <> ''
+        """,
+        create_engine(db_url),
+        params={"external_ids": tuple(external_ids)},
+    ).to_dict(orient="records")
+    return cdms_patients_data
+
+
+def drop_external_ids_not_in_cdms(df, external_id_col, cdms_patients_data):
+    """
+    If a CDMS ID was not returned by the SQL Mirror, ignore it so that
+    we can sync it if it does ever come around in future syncs.
+
+    Returns a DataFrame minus records not in external_ids.
+    """
+    external_ids = [d[external_id_col] for d in cdms_patients_data]
+    df = df.where(df[external_id_col].isin(external_ids)).dropna(
+        subset=[external_id_col]
+    )
+    return df
+
+
+def get_records_matching_dob(df, external_id_col, cdms_patients_data):
+    """
+    Accept records where the DOB from REDCap (in df) matches
+    the DOB in the CDMS patients data.
+
+    Returns a list of external IDs that may continue to be synced to CommCare.
+    """
+    lookup_df = df.set_index(external_id_col)
+    matching_ids_dobs = {d[external_id_col]: d[DOB_FIELD] for d in cdms_patients_data}
+    accepted_external_ids = []
+    for external_id, cdms_dob in matching_ids_dobs.items():
+        redcap_dob = lookup_df.loc[external_id][DOB_FIELD]
+        if redcap_dob == cdms_dob:
+            accepted_external_ids.append(external_id)
+    return accepted_external_ids
+
+
+def split_records_by_accepted_external_ids(df, accepted_external_ids, external_id_col):
+    """
+    Given the subset of external IDs in accepted_external_ids,
+    return two DataFrames; one with these IDs and one without.
+    """
+    reject_records = df.where(~df[external_id_col].isin(accepted_external_ids)).dropna(
+        subset=[external_id_col]
+    )
+    accept_records = df.where(df[external_id_col].isin(accepted_external_ids)).dropna(
+        subset=[external_id_col]
+    )
+    logger.info(
+        f"{len(accept_records.index)} were matched in CDMS by DOB and CDMS ID, "
+        f"and {len(reject_records.index)} records were not found."
+    )
+    return accept_records, reject_records
+
+
+def add_integration_status_columns(df, status, reason=""):
+    """
+    Add integration status columns with values to indicate rejection or success
+    of syncing the records. A reason should be included with rejected records
+    to be reviewed by a human.
+
+    :param df: DataFrame with REDCap record IDs
+    :param status: str, must be either REDCAP_REJECTED_PERSON or REDCAP_SENT_TO_COMMCARE.
+    :param reason: str explaining the integration status reason if being rejected.
+    """
+    df = df.copy()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    status_columns_and_values = {
+        REDCAP_INTEGRATION_STATUS: status,
+        REDCAP_INTEGRATION_STATUS_TIMESTAMP: timestamp,
+    }
+    if reason:
+        status_columns_and_values[REDCAP_INTEGRATION_STATUS_REASON] = reason
+    logger.info(
+        f"Adding integration status values to records: " f"{status_columns_and_values}"
+    )
+    for col_name, value in status_columns_and_values.items():
+        df[col_name] = value
+    return df
+
+
+def import_records_to_redcap(df, redcap_api_url, redcap_api_key):
+    """
+    This is used to update records in REDCap with the integration status.
+    """
+    logger.info(f"Updating {len(df.index)} records in REDCap.")
+    redcap_project = redcap.Project(redcap_api_url, redcap_api_key)
+    response = redcap_project.import_records(
+        to_import=df, overwrite="normal",  # Default, ignores blank values.
+    )
+    logger.info(f"Done updating {response.get('count')} REDCap records.")
+    return response
+
+
+def update_successful_records_in_redcap(
+    complete_records, incomplete_records, redcap_api_url, redcap_api_key
+):
+    """
+    When records are successfully sent to CommCare, update the integration status
+    in REDCap to indicate success.
+    """
+    df = pd.concat([complete_records, incomplete_records])
+    if len(df) > 0:
+        df = df[[REDCAP_RECORD_ID]]
+        df = add_integration_status_columns(df, status=REDCAP_SENT_TO_COMMCARE)
+        response = import_records_to_redcap(df, redcap_api_url, redcap_api_key)
+        return response
+
+
+def handle_cdms_matching(df, db_url, external_id_col, redcap_api_url, redcap_api_key):
+    """
+    Query the CommCare SQL mirror to match these records by ID and DOB,
+    reject / send any non-matching records back to REDCap with integration
+    status columns, and return a DataFrame of accepted records that can be
+    sent to CommCare.
+    """
+    logger.info(
+        f"Checking CommCare DB mirror for DOB and ID matches on {len(df.index)} records."
+    )
+    cdms_patients_data = query_cdms_for_external_ids_and_dobs(
+        df, db_url, external_id_col
+    )
+    df = drop_external_ids_not_in_cdms(df, external_id_col, cdms_patients_data)
+    matching_ids = get_records_matching_dob(df, external_id_col, cdms_patients_data)
+    accept_records, reject_records = split_records_by_accepted_external_ids(
+        df, matching_ids, external_id_col
+    )
+    if len(reject_records) > 0:
+        # Select only the 'record_id' column to identify records in REDCap
+        # and only update the integration status columns added below.
+        reject_records = reject_records[[REDCAP_RECORD_ID]]
+        reject_records = add_integration_status_columns(
+            reject_records,
+            status=REDCAP_REJECTED_PERSON,
+            reason=f"mismatched {DOB_FIELD} and {external_id_col}",
+        )
+        import_records_to_redcap(
+            reject_records,
+            redcap_api_url=redcap_api_url,
+            redcap_api_key=redcap_api_key,
+        )
+    return accept_records
+
+
+def split_complete_and_incomplete_records(df):
     """
     Splits the DataFrame into two - 'complete' meaning all rows with no
     column values missing, and 'incomplete' is the remainder.
     """
     # Drop columns where all rows are missing data.
-    cases_df = cases_df.dropna(axis=1, how="all")
+    df = df.dropna(axis=1, how="all")
     # Drop rows where any values are missing from columns.
-    complete_records = cases_df.dropna()
+    complete_records = df.dropna()
     # The inverse; select rows where any values are missing from columns.
-    incomplete_records = cases_df[cases_df.isna().any(axis=1)]
+    incomplete_records = df[df.isna().any(axis=1)]
     return complete_records, incomplete_records
 
 
@@ -143,11 +321,11 @@ def upload_complete_records(
             complete_records,
             commcare_project_name,
             "patient",
-            "external_id",
+            EXTERNAL_ID,
             commcare_user_name,
             commcare_api_key,
             create_new_cases="off",
-            search_field="external_id",
+            search_field=EXTERNAL_ID,
         )
 
 
@@ -174,9 +352,9 @@ def upload_incomplete_records(
             data,
             commcare_project_name,
             "patient",
-            "external_id",
+            EXTERNAL_ID,
             commcare_user_name,
             commcare_api_key,
             create_new_cases="off",
-            search_field="external_id",
+            search_field=EXTERNAL_ID,
         )

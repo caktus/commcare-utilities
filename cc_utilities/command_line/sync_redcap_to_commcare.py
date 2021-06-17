@@ -5,13 +5,16 @@ from datetime import datetime
 import redcap
 import yaml
 
+from cc_utilities.constants import REDCAP_INTEGRATION_STATUS
 from cc_utilities.logger import logger
 from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     collapse_housing_fields,
+    handle_cdms_matching,
     normalize_phone_cols,
     set_external_id_column,
     split_complete_and_incomplete_records,
+    update_successful_records_in_redcap,
     upload_complete_records,
     upload_incomplete_records,
 )
@@ -43,6 +46,7 @@ def main_with_args(
     external_id_col,
     phone_cols,
     state_file,
+    db_url,
     sync_all,
 ):
     """
@@ -59,6 +63,7 @@ def main_with_args(
         external_id_col (str): The name of the column in REDCap that contains the external_id for CommCare
         phone_cols (list): List of phone columns that should be normalized for CommCare
         state_file (str): File path to a local file where state about this sync can be kept
+        db_url (str): the db connection URL to query for existing patients.
         sync_all (bool): If set, ignore the date_begin in the state_file and sync all records
     """
 
@@ -98,6 +103,15 @@ def main_with_args(
                 # uploaded to CommCare.
                 "dtype": str,
             },
+            # Only retrieve records which have not already synced (either rejected or success),
+            # have a cdms_id, and with complete surveys.
+            filter_logic=" AND ".join(
+                [
+                    f"[{REDCAP_INTEGRATION_STATUS}] = ''",
+                    "[ci_survey_complete] = 2",
+                    f"[{external_id_col}] != ''",
+                ]
+            ),
         )
         if len(redcap_records.index) == 0:
             logger.info("No records returned from REDCap; aborting sync.")
@@ -107,6 +121,13 @@ def main_with_args(
                 .pipe(normalize_phone_cols, phone_cols)
                 .pipe(collapse_housing_fields)
                 .pipe(set_external_id_column, external_id_col)
+                .pipe(
+                    handle_cdms_matching,
+                    db_url,
+                    external_id_col,
+                    redcap_api_url,
+                    redcap_api_key,
+                )
                 .pipe(split_complete_and_incomplete_records)
             )
             upload_complete_records(
@@ -120,6 +141,9 @@ def main_with_args(
                 commcare_api_key,
                 commcare_project_name,
                 commcare_user_name,
+            )
+            update_successful_records_in_redcap(
+                complete_records, incomplete_records, redcap_api_url, redcap_api_key
             )
         state["date_begin"] = next_date_begin
     finally:
@@ -168,6 +192,11 @@ def main():
         required=True,
     )
     parser.add_argument(
+        "--db",
+        help="The database URL string of the db that contains patient data",
+        dest="db_url",
+    )
+    parser.add_argument(
         "--sync-all",
         help="If set, ignore the begin date in the state file and sync all records",
         action="store_true",
@@ -182,5 +211,6 @@ def main():
         args.external_id_col,
         args.phone_cols or [],
         args.state_file,
+        args.db_url,
         args.sync_all,
     )

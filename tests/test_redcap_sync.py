@@ -1,17 +1,43 @@
+import datetime
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
 
+from cc_utilities.constants import (
+    REDCAP_INTEGRATION_STATUS,
+    REDCAP_INTEGRATION_STATUS_REASON,
+    REDCAP_INTEGRATION_STATUS_TIMESTAMP,
+    REDCAP_REJECTED_PERSON,
+)
 from cc_utilities.redcap_sync import (
+    add_integration_status_columns,
     collapse_checkbox_columns,
     collapse_housing_fields,
+    drop_external_ids_not_in_cdms,
+    get_records_matching_dob,
+    handle_cdms_matching,
     normalize_phone_cols,
     set_external_id_column,
     split_complete_and_incomplete_records,
+    split_records_by_accepted_external_ids,
     upload_complete_records,
     upload_incomplete_records,
 )
+
+FAKE_TIME = datetime.datetime(2020, 3, 14, 15, 9, 26)
+
+
+@pytest.fixture
+def patch_datetime_now(monkeypatch):
+    class mock_datetime:
+        @classmethod
+        def now(cls):
+            return FAKE_TIME
+
+    monkeypatch.setattr(datetime, "datetime", mock_datetime)
+    monkeypatch.setattr("cc_utilities.redcap_sync.datetime", mock_datetime)
 
 
 def test_collapse_checkbox_columns():
@@ -196,3 +222,193 @@ def test_collapse_housing_fields():
     )
     output_df = collapse_housing_fields(input_df)
     pd.testing.assert_frame_equal(expected_output_df, output_df)
+
+
+def test_drop_external_ids_not_in_cdms():
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3"],
+            "cdms_id": ["1111", "2222", "3333"],
+            "dob": ["1978-10-01", "1953-03-17", "1933-02-04"],
+            "other_stuff": ["some", "more", "values"],
+        },
+        index=[1, 2, 3],
+    )
+    cdms_patients_data = [
+        {"cdms_id": "1111", "dob": "1978-10-01"},
+        {"cdms_id": "2222", "dob": "1990-11-08"},
+    ]
+    expected_output_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2"],
+            "cdms_id": ["1111", "2222"],
+            "dob": ["1978-10-01", "1953-03-17"],
+            "other_stuff": ["some", "more"],
+        },
+        index=[1, 2],
+    )
+    output = drop_external_ids_not_in_cdms(
+        input_df, external_id_col="cdms_id", cdms_patients_data=cdms_patients_data
+    )
+    pd.testing.assert_frame_equal(output, expected_output_df)
+
+
+def test_get_records_matching_dob():
+    external_id_col = "cdms_id"
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3"],
+            "cdms_id": ["1111", "2222", "3333"],
+            "dob": ["1978-10-01", "1953-03-17", "1933-02-04"],
+            "other_stuff": ["some", "more", "values"],
+        },
+        index=[1, 2, 3],
+    )
+    cdms_patients_data = [
+        {"cdms_id": "1111", "dob": "1978-10-01"},
+        {"cdms_id": "2222", "dob": "1990-11-08"},
+    ]
+    expected_accepted_external_ids = ["1111"]
+    accepted_external_ids = get_records_matching_dob(
+        df=input_df,
+        external_id_col=external_id_col,
+        cdms_patients_data=cdms_patients_data,
+    )
+    assert expected_accepted_external_ids == accepted_external_ids
+
+
+def test_split_records_by_accepted_external_ids():
+    """
+    Given a dictionary containing external IDs from CDMS based on values
+    that matched on both the external ID and DOB fields, split_records_by_accepted_external_ids
+    should return two DataFrames by selecting the matched / mismatched rows.
+    """
+    external_id_col = "cdms_id"
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3"],
+            "cdms_id": ["1111", "2222", "3333"],
+            "external_id": ["1111", "2222", "3333"],
+            "dob": ["2001-01-01", "1953-03-17", "1933-02-04"],
+            "other_stuff": ["some", "more", "values"],
+        },
+        index=[1, 2, 3],
+    )
+    expected_matching_df = pd.DataFrame(
+        {
+            "record_id": ["1", "3"],
+            "cdms_id": ["1111", "3333"],
+            "external_id": ["1111", "3333"],
+            "dob": ["2001-01-01", "1933-02-04"],
+            "other_stuff": ["some", "values"],
+        },
+        index=[1, 3],
+    )
+    expected_not_matching_df = pd.DataFrame(
+        {
+            "record_id": ["2"],
+            "cdms_id": ["2222"],
+            "external_id": ["2222"],
+            "dob": ["1953-03-17"],
+            "other_stuff": ["more"],
+        },
+        index=[2],
+    )
+    matching_ids = ["1111", "3333"]
+    accept_records, reject_records = split_records_by_accepted_external_ids(
+        input_df, accepted_external_ids=matching_ids, external_id_col=external_id_col
+    )
+    pd.testing.assert_frame_equal(accept_records, expected_matching_df)
+    pd.testing.assert_frame_equal(reject_records, expected_not_matching_df)
+
+
+def test_add_reject_status_columns(patch_datetime_now):
+    dob_field = "dob"
+    external_id_col = "cdms_id"
+    input_df = pd.DataFrame({"record_id": ["1", "2", "3"]}, index=[1, 2, 3])
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    reason = f"mismatched {dob_field} and {external_id_col}"
+    expected_output_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3"],
+            "integration_status": [REDCAP_REJECTED_PERSON for i in range(3)],
+            "integration_status_timestamp": [timestamp for i in range(3)],
+            "integration_status_reason": [reason for i in range(3)],
+        },
+        index=[1, 2, 3],
+    )
+    output_df = add_integration_status_columns(
+        input_df, status=REDCAP_REJECTED_PERSON, reason=reason
+    )
+    pd.testing.assert_frame_equal(expected_output_df, output_df)
+
+
+@patch("cc_utilities.redcap_sync.import_records_to_redcap")
+@patch("cc_utilities.redcap_sync.query_cdms_for_external_ids_and_dobs")
+def test_handle_cdms_matching(
+    mock_query_cdms_for_external_ids_and_dobs,
+    mock_import_records_to_redcap,
+    patch_datetime_now,
+):
+    """
+    Given the list of external IDs returned after comparing
+    CDMS IDs and DOBs, assert that handle_cdms_matching properly
+    handles accepted and rejected records; sending the rejected
+    records back to redcap with record_ids and integration status,
+    and returns the accepted records.
+    """
+    mock_cdms_patients_data = [
+        {"cdms_id": "2222", "dob": "1953-03-17"},  # a fully matching record
+        {"cdms_id": "3333", "dob": "2020-01-01"},  # a mismatch on dob
+        # one record left out to be ignored by drop_external_ids_not_in_cdms
+    ]
+    mock_query_cdms_for_external_ids_and_dobs.return_value = mock_cdms_patients_data
+
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3"],
+            "cdms_id": ["1111", "2222", "3333"],
+            "external_id": ["1111", "2222", "3333"],
+            "dob": [None, "1953-03-17", "1933-02-04"],
+            "other_stuff": ["some", "more", "values"],
+        },
+        index=[1, 2, 3],
+    )
+    # Expect handle_cdms_matching to return the matching records.
+    expected_accepted_records = pd.DataFrame(
+        {
+            "record_id": ["2"],
+            "cdms_id": ["2222"],
+            "external_id": ["2222"],
+            "dob": ["1953-03-17"],
+            "other_stuff": ["more"],
+        },
+        index=[2],
+    )
+
+    # Expect import_records_to_redcap to be called with integration status data.
+    expected_error_status_columns = {
+        REDCAP_INTEGRATION_STATUS: [REDCAP_REJECTED_PERSON],
+        REDCAP_INTEGRATION_STATUS_TIMESTAMP: [
+            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ],
+        REDCAP_INTEGRATION_STATUS_REASON: ["mismatched dob and cdms_id"],
+    }
+    expected_reject_records = pd.DataFrame(
+        {"record_id": ["3"], **expected_error_status_columns}, index=[3]
+    )
+
+    output = handle_cdms_matching(
+        input_df,
+        db_url="test",
+        external_id_col="cdms_id",
+        redcap_api_url="test",
+        redcap_api_key="test",
+    )
+
+    mock_query_cdms_for_external_ids_and_dobs.assert_called_once()
+    mock_import_records_to_redcap.assert_called_once()
+    pd.testing.assert_frame_equal(
+        mock_import_records_to_redcap.call_args[0][0], expected_reject_records
+    )
+    pd.testing.assert_frame_equal(output, expected_accepted_records)

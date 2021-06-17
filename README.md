@@ -330,6 +330,7 @@ sync-redcap-to-commcare \
   --redcap-api-key=$REDCAP_API_KEY \
   --external-id-col=cdms_id \
   --state-file=redcap_test.yaml \
+  --db=$DB_URL \
   --sync-all
 ```
 
