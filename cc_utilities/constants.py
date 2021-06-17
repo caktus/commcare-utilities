@@ -55,6 +55,14 @@ COMMCARE_DEFAULT_HIDDEN_FIELD_MAPPINGS = {
     ("user_id", "user_id"),
 }
 
+INTERVIEW_DISPOSITION = "interview_disposition"
+ACCEPTED_INTERVIEW_DISPOSITION_VALUES = [
+    "no_attempt",
+    "voicemail_sms",
+    "no_voicemail",
+    "invalid_phone_number",
+    "attempted_4_days",
+]
 # For bulk contact upload, these values should be added to each contact, where key
 # is the column name, and val is the row val for that column
 COMMCARE_DEFAULT_CONTACT_KEY_VALUES = {

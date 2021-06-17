@@ -12,6 +12,7 @@ from cc_utilities.redcap_sync import (
     collapse_housing_fields,
     handle_cdms_matching,
     normalize_phone_cols,
+    reject_records_already_filled_out_by_case_investigator,
     set_external_id_column,
     split_complete_and_incomplete_records,
     update_successful_records_in_redcap,
@@ -121,6 +122,15 @@ def main_with_args(
                 .pipe(normalize_phone_cols, phone_cols)
                 .pipe(collapse_housing_fields)
                 .pipe(set_external_id_column, external_id_col)
+                .pipe(
+                    reject_records_already_filled_out_by_case_investigator,
+                    external_id_col,
+                    commcare_project_name,
+                    commcare_user_name,
+                    commcare_api_key,
+                    redcap_api_url,
+                    redcap_api_key,
+                )
                 .pipe(
                     handle_cdms_matching,
                     db_url,

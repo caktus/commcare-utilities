@@ -362,7 +362,7 @@ def mock_get_commcare_cases(monkeypatch):
     def mock(*args, **kwargs):
         return MockCommCareFunctions.get_commcare_cases(*args, **kwargs)
 
-    monkeypatch.setattr("cc_utilities.legacy_upload.get_commcare_cases", mock)
+    monkeypatch.setattr("cc_utilities.common.get_commcare_cases", mock)
 
 
 @pytest.fixture

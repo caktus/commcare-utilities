@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from cc_utilities.constants import (
+    ACCEPTED_INTERVIEW_DISPOSITION_VALUES,
     REDCAP_INTEGRATION_STATUS,
     REDCAP_INTEGRATION_STATUS_REASON,
     REDCAP_INTEGRATION_STATUS_TIMESTAMP,
@@ -16,9 +17,11 @@ from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     collapse_housing_fields,
     drop_external_ids_not_in_cdms,
+    get_commcare_cases_with_acceptable_interview_dispositions,
     get_records_matching_dob,
     handle_cdms_matching,
     normalize_phone_cols,
+    reject_records_already_filled_out_by_case_investigator,
     set_external_id_column,
     split_complete_and_incomplete_records,
     split_records_by_accepted_external_ids,
@@ -412,3 +415,100 @@ def test_handle_cdms_matching(
         mock_import_records_to_redcap.call_args[0][0], expected_reject_records
     )
     pd.testing.assert_frame_equal(output, expected_accepted_records)
+
+
+def test_get_commcare_cases_with_acceptable_interview_dispositions():
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3", "4"],
+            "cdms_id": ["1111", "2222", "3333", "4444"],
+            "external_id": ["1111", "2222", "3333", "4444"],
+            "dob": [None, "1953-03-17", "1933-02-04", None],
+            "other_stuff": ["some", "more", "values", None],
+        },
+        index=[1, 2, 3, 4],
+    )
+
+    case_mocks = [
+        [
+            {
+                "properties": {
+                    "interview_disposition": ACCEPTED_INTERVIEW_DISPOSITION_VALUES[0]
+                }
+            }
+        ],
+        [{"properties": {"interview_disposition": "unacceptable"}}],
+        None,
+        [{"properties": {"other": ""}}],
+    ]
+    expected_accepted_external_ids = ["1111"]
+    with patch(
+        "cc_utilities.redcap_sync.get_commcare_cases_by_external_id_with_backoff",
+        side_effect=case_mocks,
+    ) as mock_get_commcare_cases_by_external_id_with_backoff:
+        accepted_external_ids = get_commcare_cases_with_acceptable_interview_dispositions(
+            input_df, "cdms_id", "test_key", "test_user_name", "test_project"
+        )
+    assert mock_get_commcare_cases_by_external_id_with_backoff.call_count == len(
+        input_df
+    )
+    assert accepted_external_ids == expected_accepted_external_ids
+
+
+def test_reject_records_already_filled_out_by_case_investigator():
+    input_df = pd.DataFrame(
+        {
+            "record_id": ["1", "2", "3", "4"],
+            "cdms_id": ["1111", "2222", "3333", "4444"],
+            "external_id": ["1111", "2222", "3333", "4444"],
+            "dob": [None, "1953-03-17", "1933-02-04", None],
+            "other_stuff": ["some", "more", "values", None],
+        },
+        index=[1, 2, 3, 4],
+    )
+
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    reason = "Case already submitted by a Case Investigator."
+    expected_reject_records = pd.DataFrame(
+        {
+            "record_id": ["3", "4"],
+            "integration_status": ["rejected_person" for i in range(2)],
+            "integration_status_timestamp": [timestamp for i in range(2)],
+            "integration_status_reason": [reason for i in range(2)],
+        },
+        index=[3, 4],
+    )
+
+    mock_accepted_external_ids = ["1111", "2222"]
+    expected_accepted_records = pd.DataFrame(
+        {
+            "record_id": ["1", "2"],
+            "cdms_id": ["1111", "2222"],
+            "external_id": ["1111", "2222"],
+            "dob": [None, "1953-03-17"],
+            "other_stuff": ["some", "more"],
+        },
+        index=[1, 2],
+    )
+    with patch(
+        "cc_utilities.redcap_sync.get_commcare_cases_with_acceptable_interview_dispositions",
+        return_value=mock_accepted_external_ids,
+    ) as mock_get_commcare_cases_with_acceptable_interview_dispositions:
+        with patch(
+            "cc_utilities.redcap_sync.import_records_to_redcap"
+        ) as mock_import_records_to_redcap:
+            accepted_records = reject_records_already_filled_out_by_case_investigator(
+                input_df,
+                "cdms_id",
+                "project_slug",
+                "cc_user_name",
+                "cc_api_key",
+                "redcap_api_url",
+                "redcap_api_key",
+            )
+    mock_get_commcare_cases_with_acceptable_interview_dispositions.assert_called_once()
+    mock_import_records_to_redcap.assert_called_once()
+    pd.testing.assert_frame_equal(
+        mock_import_records_to_redcap.call_args[0][0], expected_reject_records
+    )
+    pd.testing.assert_frame_equal(accepted_records, expected_accepted_records)
