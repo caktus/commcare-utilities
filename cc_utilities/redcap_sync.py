@@ -202,8 +202,8 @@ def split_records_by_accepted_external_ids(df, accepted_external_ids, external_i
         subset=[external_id_col]
     )
     logger.info(
-        f"{len(accept_records.index)} were matched in CDMS by DOB and CDMS ID, "
-        f"and {len(reject_records.index)} records were not found."
+        f"{len(accept_records.index)} were accepted, "
+        f"and {len(reject_records.index)} records were rejected."
     )
     return accept_records, reject_records
 
