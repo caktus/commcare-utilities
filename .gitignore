@@ -14,3 +14,4 @@ __pycache__/
 .python-version
 .idea
 redcap_test.yaml
+.ipynb_checkpoints

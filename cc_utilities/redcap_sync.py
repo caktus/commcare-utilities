@@ -4,7 +4,7 @@ from functools import partial
 
 import pandas as pd
 import redcap
-from sqlalchemy import create_engine
+from sqlalchemy import MetaData, Table, create_engine, select
 
 from .common import (
     get_commcare_cases_by_external_id_with_backoff,
@@ -145,19 +145,17 @@ def query_cdms_for_external_ids_and_dobs(
     Returns a list of matching rows, as dictionaries with external_id_col values.
     """
     external_ids = df[EXTERNAL_ID].tolist()
-    cdms_patients_data = pd.read_sql(
-        f"""SELECT
-                {external_id_col},
-                {DOB_FIELD}
-            FROM {table_name}
-            WHERE
-                {external_id_col} IN %(external_ids)s
-                AND {DOB_FIELD} IS NOT NULL
-                AND {DOB_FIELD} <> ''
-        """,
-        create_engine(db_url),
-        params={"external_ids": tuple(external_ids)},
-    ).to_dict(orient="records")
+    engine = create_engine(db_url)
+    meta = MetaData(bind=engine)
+    table = Table(table_name, meta, autoload=True, autoload_with=engine)
+    query = select(
+        [getattr(table.c, external_id_col), getattr(table.c, DOB_FIELD)]
+    ).where(
+        getattr(table.c, external_id_col).in_(external_ids),
+        getattr(table.c, DOB_FIELD).isnot(None),
+        getattr(table.c, DOB_FIELD) != "",
+    )
+    cdms_patients_data = pd.read_sql(query, engine).to_dict(orient="records")
     return cdms_patients_data
 
 
@@ -204,8 +202,8 @@ def split_records_by_accepted_external_ids(df, accepted_external_ids, external_i
         subset=[external_id_col]
     )
     logger.info(
-        f"{len(accept_records.index)} were matched in CDMS by DOB and CDMS ID, "
-        f"and {len(reject_records.index)} records were not found."
+        f"{len(accept_records.index)} were accepted, "
+        f"and {len(reject_records.index)} records were rejected."
     )
     return accept_records, reject_records
 
@@ -312,8 +310,8 @@ def get_commcare_cases_with_acceptable_interview_dispositions(
     accepted_external_ids = []
     external_ids = df[external_id_col].to_list()
     for ext_id in external_ids:
-        # Get cases in CommCare to compare interview_disposition.
-        # Querying CDMS would be a favorable source of truth for this, but did
+        # Get cases in CommCare to compare interview_disposition. Querying
+        # the SQL mirror would be a favorable source of truth for this, but did
         # not seem to have this column available at the time of implementing this.
         cases = get_commcare_cases_by_external_id_with_backoff(
             project_slug, cc_user_name, cc_api_key, external_id=ext_id
