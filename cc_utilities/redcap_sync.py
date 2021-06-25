@@ -113,12 +113,19 @@ def normalize_phone_cols(df, phone_cols):
     """
     df = df.copy()
     for col_name in phone_cols:
-        # replace N/A values with empty string before normalizing
-        df[col_name] = (
-            df[col_name]
-            .fillna("")
-            .apply(partial(normalize_phone_number, col_name=col_name))
-        )
+        if col_name in df.columns:
+            df[col_name] = (
+                df[col_name]
+                # Replace N/A values with empty string before normalizing.
+                .fillna("").apply(partial(normalize_phone_number, col_name=col_name))
+            )
+        else:
+            # Don't fail altogether in case of a misconfiguration in the calling
+            # script, but do issue a warning.
+            logger.warning(
+                f'Phone column "{col_name}" requested to be normalized '
+                "but not found in dataframe."
+            )
     return df
 
 
