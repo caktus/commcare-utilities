@@ -61,20 +61,27 @@ def main_with_args(
         except Exception as exc:
             logger.error(f"Something unexpected happened: {exc.message}")
             raise exc
-        logger.info(
-            f"Uploading SMS capability status for {len(contacts_data)} {case_type}(s) from "
-            f"batch {batch_num} of {expected_batches} to CommCare."
-        )
-        upload_data_to_commcare(
-            contacts_data,
-            commcare_project_name,
-            case_type,
-            search_column,
-            commcare_user_name,
-            commcare_api_key,
-            "off",
-            file_name_prefix="twilio_sms_capability_",
-        )
+
+        if len(contacts_data) > 0:
+            logger.info(
+                f"Uploading SMS capability status for {len(contacts_data)} {case_type}(s) from "
+                f"batch {batch_num} of {expected_batches} to CommCare."
+            )
+            upload_data_to_commcare(
+                contacts_data,
+                commcare_project_name,
+                case_type,
+                search_column,
+                commcare_user_name,
+                commcare_api_key,
+                "off",
+                file_name_prefix="twilio_sms_capability_",
+            )
+        else:
+            logger.info(
+                f"Skipping upload because there are no {case_type}s "
+                f"in batch {batch_num} of {expected_batches}."
+            )
 
 
 def main():
