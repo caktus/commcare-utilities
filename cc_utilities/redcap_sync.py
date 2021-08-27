@@ -132,11 +132,14 @@ def populate_symptom_columns(df):
     """
     df = df.copy()
 
+    logger.info(f"Calculating and adding column {SYMPTOM_COUNT} to df.")
     # Count values from column names starting with 'symptoms_selected___'
     # the checkbox column values will be 1 if selected, 0 if not selected, so
     # we can just take a sum of the values.
     symptom_columns = [col for col in df if col.startswith(SYMPTOM_COLUMNS_PREFIX)]
     df[SYMPTOM_COUNT] = df[symptom_columns].astype(int).sum(axis=1)
+
+    logger.info(f"Calculating and adding column {SYMPTOMATIC} to df.")
 
     def apply_symptomatic(row):
         if row[SYMPTOM_COUNT] > 0:
