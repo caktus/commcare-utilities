@@ -25,6 +25,8 @@ from .constants import (
     REDCAP_RECORD_ID,
     REDCAP_REJECTED_PERSON,
     REDCAP_SENT_TO_COMMCARE,
+    SYMPTOM_COUNT,
+    SYMPTOMATIC,
 )
 from .legacy_upload import normalize_phone_number
 from .logger import logger
@@ -119,6 +121,27 @@ def normalize_phone_cols(df, phone_cols):
             .fillna("")
             .apply(partial(normalize_phone_number, col_name=col_name))
         )
+    return df
+
+
+def populate_symptom_columns(df):
+    """
+    Calculate the 'symptom_count' value and then use it to determine the value
+    of the 'symptomatic' column.
+    """
+    df = df.copy()
+
+    # TODO: count values from column names starting with 'symptoms_selected___'
+    df[SYMPTOM_COUNT] = 1
+
+    def apply_symptomatic(row):
+        if row[SYMPTOM_COUNT] > 0:
+            symptomatic = "yes"
+        else:
+            symptomatic = "no"
+        return symptomatic
+
+    df[SYMPTOMATIC] = df.apply(lambda row: apply_symptomatic(row), axis=1)
     return df
 
 
