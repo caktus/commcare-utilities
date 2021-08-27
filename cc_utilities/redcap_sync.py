@@ -6,10 +6,7 @@ import pandas as pd
 import redcap
 from sqlalchemy import MetaData, Table, create_engine, select
 
-from .common import (
-    get_commcare_cases_by_external_id_with_backoff,
-    upload_data_to_commcare,
-)
+from .common import get_commcare_cases, upload_data_to_commcare
 from .constants import (
     ACCEPTED_INTERVIEW_DISPOSITION_VALUES,
     DOB_FIELD,
@@ -25,6 +22,7 @@ from .constants import (
     REDCAP_RECORD_ID,
     REDCAP_REJECTED_PERSON,
     REDCAP_SENT_TO_COMMCARE,
+    SYMPTOM_COLUMNS_PREFIX,
     SYMPTOM_COUNT,
     SYMPTOMATIC,
 )
@@ -131,15 +129,17 @@ def populate_symptom_columns(df):
     """
     df = df.copy()
 
-    # TODO: count values from column names starting with 'symptoms_selected___'
-    df[SYMPTOM_COUNT] = 1
+    # Count values from column names starting with 'symptoms_selected___'
+    # the checkbox column values will be 1 if selected, 0 if not selected, so
+    # we can just take a sum of the values.
+    symptom_columns = [col for col in df if col.startswith(SYMPTOM_COLUMNS_PREFIX)]
+    df[SYMPTOM_COUNT] = df[symptom_columns].astype(int).sum(axis=1)
 
     def apply_symptomatic(row):
         if row[SYMPTOM_COUNT] > 0:
-            symptomatic = "yes"
+            return "yes"
         else:
-            symptomatic = "no"
-        return symptomatic
+            return "no"
 
     df[SYMPTOMATIC] = df.apply(lambda row: apply_symptomatic(row), axis=1)
     return df
@@ -336,7 +336,7 @@ def get_commcare_cases_with_acceptable_interview_dispositions(
         # Get cases in CommCare to compare interview_disposition. Querying
         # the SQL mirror would be a favorable source of truth for this, but did
         # not seem to have this column available at the time of implementing this.
-        cases = get_commcare_cases_by_external_id_with_backoff(
+        cases = get_commcare_cases(
             project_slug, cc_user_name, cc_api_key, external_id=ext_id
         )
         if cases:
