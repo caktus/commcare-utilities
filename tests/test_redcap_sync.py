@@ -93,6 +93,7 @@ def test_populate_symptom_columns():
             "symptoms_selected___cough": ["0", "1", "1", "0"],
             "symptoms_selected___sore_throat": ["0", "0", "1", "0"],
             "symptoms_selected___other": ["1", "0", "0", "0"],
+            "symptoms_selected___none": ["0", "0", "0", "1"],
         }
     )
     expected_output_df = pd.DataFrame(
@@ -101,6 +102,7 @@ def test_populate_symptom_columns():
             "symptoms_selected___cough": ["0", "1", "1", "0"],
             "symptoms_selected___sore_throat": ["0", "0", "1", "0"],
             "symptoms_selected___other": ["1", "0", "0", "0"],
+            "symptoms_selected___none": ["0", "0", "0", "1"],
             SYMPTOM_COUNT: [2, 1, 3, 0],
             SYMPTOMATIC: ["yes", "yes", "yes", "no"],
         }

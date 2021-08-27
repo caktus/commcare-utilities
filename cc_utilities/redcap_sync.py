@@ -28,6 +28,7 @@ from .constants import (
     SYMPTOM_COLUMNS_PREFIX,
     SYMPTOM_COUNT,
     SYMPTOMATIC,
+    SYMPTOMS_NONE,
 )
 from .legacy_upload import normalize_phone_number
 from .logger import logger
@@ -137,6 +138,7 @@ def populate_symptom_columns(df):
     # the checkbox column values will be 1 if selected, 0 if not selected, so
     # we can just take a sum of the values.
     symptom_columns = [col for col in df if col.startswith(SYMPTOM_COLUMNS_PREFIX)]
+    symptom_columns.remove(SYMPTOMS_NONE)
     df[SYMPTOM_COUNT] = df[symptom_columns].astype(int).sum(axis=1)
 
     logger.info(f"Calculating and adding column {SYMPTOMATIC} to df.")

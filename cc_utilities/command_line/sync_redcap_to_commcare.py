@@ -118,6 +118,7 @@ def main_with_args(
         if len(redcap_records.index) == 0:
             logger.info("No records returned from REDCap; aborting sync.")
         else:
+            logger.info(f"Found {len(redcap_records)} REDCap records to sync.")
             complete_records, incomplete_records = (
                 redcap_records.pipe(populate_symptom_columns)
                 .pipe(collapse_checkbox_columns)
