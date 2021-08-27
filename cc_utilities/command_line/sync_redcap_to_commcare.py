@@ -119,10 +119,10 @@ def main_with_args(
             logger.info("No records returned from REDCap; aborting sync.")
         else:
             complete_records, incomplete_records = (
-                redcap_records.pipe(collapse_checkbox_columns)
+                redcap_records.pipe(populate_symptom_columns)
+                .pipe(collapse_checkbox_columns)
                 .pipe(normalize_phone_cols, phone_cols)
                 .pipe(collapse_housing_fields)
-                .pipe(populate_symptom_columns)
                 .pipe(set_external_id_column, external_id_col)
                 .pipe(
                     reject_records_already_filled_out_by_case_investigator,
