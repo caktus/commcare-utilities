@@ -6,7 +6,10 @@ import pandas as pd
 import redcap
 from sqlalchemy import MetaData, Table, create_engine, select
 
-from .common import get_commcare_cases, upload_data_to_commcare
+from .common import (
+    get_commcare_cases_by_external_id_with_backoff,
+    upload_data_to_commcare,
+)
 from .constants import (
     ACCEPTED_INTERVIEW_DISPOSITION_VALUES,
     DOB_FIELD,
@@ -336,7 +339,7 @@ def get_commcare_cases_with_acceptable_interview_dispositions(
         # Get cases in CommCare to compare interview_disposition. Querying
         # the SQL mirror would be a favorable source of truth for this, but did
         # not seem to have this column available at the time of implementing this.
-        cases = get_commcare_cases(
+        cases = get_commcare_cases_by_external_id_with_backoff(
             project_slug, cc_user_name, cc_api_key, external_id=ext_id
         )
         if cases:
