@@ -120,6 +120,9 @@ def main_with_args(
         else:
             logger.info(f"Found {len(redcap_records)} REDCap records to sync.")
             complete_records, incomplete_records = (
+                # populate_symptom_columns must come before collapse_checkbox_columns, since
+                # it relies on the data structure of a set of checkboxes ("symptoms_selected")
+                # before it's collapsed
                 redcap_records.pipe(populate_symptom_columns)
                 .pipe(collapse_checkbox_columns)
                 .pipe(normalize_phone_cols, phone_cols)
