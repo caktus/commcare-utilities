@@ -187,7 +187,7 @@ Finally, note that this script presently is configured to work with US-based pho
 2. Gather your Twilio SID and auth token.
 3. Install the appropriate db engine library for your database. If you're not sure what that is, run the script without doing this, and you'll get a `ModuleNotFoundError` with the name of the required library.
 4. Optionally, copy over `sample.env` to `.env` and insert appropriate values. Source those values before the next step.
-5. Run the script. Assuming the referenced variables are set: `process-numbers-for-sms-capability --db $DB_URL --username $COMMCARE_USER_NAME --api-key $COMMCARE_API_KEY --project $COMMCARE_PROJECT_NAME --twilio-sid $TWILIO_SID --twilio-token $TWILIO_TOKEN` --case-type contact.
+5. Run the script. Assuming the referenced variables are set: `process-numbers-for-sms-capability --db $DB_URL --username $COMMCARE_USER_NAME --api-key $COMMCARE_API_KEY --project $COMMCARE_PROJECT_NAME --twilio-sid $TWILIO_SID --twilio-token $TWILIO_TOKEN --case-type contact`.
 6. Any new columns added to the DB will be noted in the command-line output of the script.
 
 ### `bulk-upload-legacy-contact-data`
