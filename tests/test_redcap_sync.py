@@ -79,7 +79,8 @@ def test_normalize_phone_cols():
             "phone2": ["(919) 555-1215", "9195551216", float("nan")],
         }
     )
-    output_df = normalize_phone_cols(input_df, ["phone1"])
+    # phone3 doesn't exist and shouldn't cause a hard failure
+    output_df = normalize_phone_cols(input_df, ["phone1", "phone3"])
     pd.testing.assert_frame_equal(expected_output_df, output_df)
 
 
