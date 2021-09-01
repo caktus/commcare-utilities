@@ -25,6 +25,10 @@ from .constants import (
     REDCAP_RECORD_ID,
     REDCAP_REJECTED_PERSON,
     REDCAP_SENT_TO_COMMCARE,
+    SYMPTOM_COLUMNS_PREFIX,
+    SYMPTOM_COUNT,
+    SYMPTOMATIC,
+    SYMPTOMS_NONE,
 )
 from .legacy_upload import normalize_phone_number
 from .logger import logger
@@ -126,6 +130,34 @@ def normalize_phone_cols(df, phone_cols):
                 f'Phone column "{col_name}" requested to be normalized '
                 "but not found in dataframe."
             )
+    return df
+
+
+def populate_symptom_columns(df):
+    """
+    Calculate the 'symptom_count' value and then use it to determine the value
+    of the 'symptomatic' column.
+    """
+    df = df.copy()
+
+    logger.info(f"Calculating and adding column {SYMPTOM_COUNT} to df.")
+    # Count values from column names starting with 'symptoms_selected___'
+    # the checkbox column values will be 1 if selected, 0 if not selected, so
+    # we can just take a sum of the values.
+    symptom_columns = [col for col in df if col.startswith(SYMPTOM_COLUMNS_PREFIX)]
+    if SYMPTOMS_NONE in symptom_columns:
+        symptom_columns.remove(SYMPTOMS_NONE)
+    df[SYMPTOM_COUNT] = df[symptom_columns].astype(int).sum(axis=1)
+
+    logger.info(f"Calculating and adding column {SYMPTOMATIC} to df.")
+
+    def apply_symptomatic(row):
+        if row[SYMPTOM_COUNT] > 0:
+            return "yes"
+        else:
+            return "no"
+
+    df[SYMPTOMATIC] = df.apply(lambda row: apply_symptomatic(row), axis=1)
     return df
 
 

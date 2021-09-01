@@ -12,6 +12,7 @@ from cc_utilities.redcap_sync import (
     collapse_housing_fields,
     handle_cdms_matching,
     normalize_phone_cols,
+    populate_symptom_columns,
     reject_records_already_filled_out_by_case_investigator,
     set_external_id_column,
     split_complete_and_incomplete_records,
@@ -117,8 +118,13 @@ def main_with_args(
         if len(redcap_records.index) == 0:
             logger.info("No records returned from REDCap; aborting sync.")
         else:
+            logger.info(f"Found {len(redcap_records)} REDCap records to sync.")
             complete_records, incomplete_records = (
-                redcap_records.pipe(collapse_checkbox_columns)
+                # populate_symptom_columns must come before collapse_checkbox_columns, since
+                # it relies on the data structure of a set of checkboxes ("symptoms_selected")
+                # before it's collapsed
+                redcap_records.pipe(populate_symptom_columns)
+                .pipe(collapse_checkbox_columns)
                 .pipe(normalize_phone_cols, phone_cols)
                 .pipe(collapse_housing_fields)
                 .pipe(set_external_id_column, external_id_col)

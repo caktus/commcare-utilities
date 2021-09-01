@@ -11,6 +11,8 @@ from cc_utilities.constants import (
     REDCAP_INTEGRATION_STATUS_REASON,
     REDCAP_INTEGRATION_STATUS_TIMESTAMP,
     REDCAP_REJECTED_PERSON,
+    SYMPTOM_COUNT,
+    SYMPTOMATIC,
 )
 from cc_utilities.redcap_sync import (
     add_integration_status_columns,
@@ -21,6 +23,7 @@ from cc_utilities.redcap_sync import (
     get_records_matching_dob,
     handle_cdms_matching,
     normalize_phone_cols,
+    populate_symptom_columns,
     reject_records_already_filled_out_by_case_investigator,
     set_external_id_column,
     split_complete_and_incomplete_records,
@@ -81,6 +84,31 @@ def test_normalize_phone_cols():
     )
     # phone3 doesn't exist and shouldn't cause a hard failure
     output_df = normalize_phone_cols(input_df, ["phone1", "phone3"])
+    pd.testing.assert_frame_equal(expected_output_df, output_df)
+
+
+def test_populate_symptom_columns():
+    input_df = pd.DataFrame(
+        {
+            "symptoms_selected___fever": ["1", "0", "1", "0"],
+            "symptoms_selected___cough": ["0", "1", "1", "0"],
+            "symptoms_selected___sore_throat": ["0", "0", "1", "0"],
+            "symptoms_selected___other": ["1", "0", "0", "0"],
+            "symptoms_selected___none": ["0", "0", "0", "1"],
+        }
+    )
+    expected_output_df = pd.DataFrame(
+        {
+            "symptoms_selected___fever": ["1", "0", "1", "0"],
+            "symptoms_selected___cough": ["0", "1", "1", "0"],
+            "symptoms_selected___sore_throat": ["0", "0", "1", "0"],
+            "symptoms_selected___other": ["1", "0", "0", "0"],
+            "symptoms_selected___none": ["0", "0", "0", "1"],
+            SYMPTOM_COUNT: [2, 1, 3, 0],
+            SYMPTOMATIC: ["yes", "yes", "yes", "no"],
+        }
+    )
+    output_df = populate_symptom_columns(input_df)
     pd.testing.assert_frame_equal(expected_output_df, output_df)
 
 
