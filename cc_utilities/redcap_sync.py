@@ -360,6 +360,8 @@ def get_commcare_cases_with_acceptable_interview_dispositions(
             interview_disposition = case_properties.get(INTERVIEW_DISPOSITION)
             if interview_disposition in ACCEPTED_INTERVIEW_DISPOSITION_VALUES:
                 accepted_external_ids.append(ext_id)
+        else:
+            logger.warning(f"external_id {ext_id} not found in CommCare")
     return accepted_external_ids
 
 

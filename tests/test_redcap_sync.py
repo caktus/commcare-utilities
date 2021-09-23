@@ -467,7 +467,7 @@ def test_get_commcare_cases_with_acceptable_interview_dispositions():
             }
         ],
         [{"properties": {"interview_disposition": "unacceptable"}}],
-        None,
+        [],  # get_commcare_cases returns empty list if not found
         [{"properties": {"other": ""}}],
     ]
     expected_accepted_external_ids = ["1111"]
