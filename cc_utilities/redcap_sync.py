@@ -6,10 +6,7 @@ import pandas as pd
 import redcap
 from sqlalchemy import MetaData, Table, create_engine, select
 
-from .common import (
-    get_commcare_cases_by_external_id_with_backoff,
-    upload_data_to_commcare,
-)
+from .common import get_commcare_cases, upload_data_to_commcare
 from .constants import (
     ACCEPTED_INTERVIEW_DISPOSITION_VALUES,
     DOB_FIELD,
@@ -352,7 +349,10 @@ def get_commcare_cases_with_acceptable_interview_dispositions(
         # Get cases in CommCare to compare interview_disposition. Querying
         # the SQL mirror would be a favorable source of truth for this, but did
         # not seem to have this column available at the time of implementing this.
-        cases = get_commcare_cases_by_external_id_with_backoff(
+        # In the event no case is found in CommCare, it will NOT be allowed to sync
+        # since presumably this would create a new record rather than update an
+        # existing one anyways.
+        cases = get_commcare_cases(
             project_slug, cc_user_name, cc_api_key, external_id=ext_id
         )
         if cases:
@@ -360,6 +360,8 @@ def get_commcare_cases_with_acceptable_interview_dispositions(
             interview_disposition = case_properties.get(INTERVIEW_DISPOSITION)
             if interview_disposition in ACCEPTED_INTERVIEW_DISPOSITION_VALUES:
                 accepted_external_ids.append(ext_id)
+        else:
+            logger.warning(f"external_id {ext_id} not found in CommCare")
     return accepted_external_ids
 
 
@@ -392,7 +394,7 @@ def reject_records_already_filled_out_by_case_investigator(
         reject_records = add_integration_status_columns(
             reject_records,
             status=REDCAP_REJECTED_PERSON,
-            reason="Case already submitted by a Case Investigator.",
+            reason="Case not found or already submitted by a Case Investigator.",
         )
         import_records_to_redcap(reject_records, redcap_api_url, redcap_api_key)
     logger.info("Done.")
