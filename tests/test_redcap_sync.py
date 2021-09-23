@@ -472,15 +472,12 @@ def test_get_commcare_cases_with_acceptable_interview_dispositions():
     ]
     expected_accepted_external_ids = ["1111"]
     with patch(
-        "cc_utilities.redcap_sync.get_commcare_cases_by_external_id_with_backoff",
-        side_effect=case_mocks,
-    ) as mock_get_commcare_cases_by_external_id_with_backoff:
+        "cc_utilities.redcap_sync.get_commcare_cases", side_effect=case_mocks,
+    ) as mock_get_commcare_cases:
         accepted_external_ids = get_commcare_cases_with_acceptable_interview_dispositions(
             input_df, "cdms_id", "test_key", "test_user_name", "test_project"
         )
-    assert mock_get_commcare_cases_by_external_id_with_backoff.call_count == len(
-        input_df
-    )
+    assert mock_get_commcare_cases.call_count == len(input_df)
     assert accepted_external_ids == expected_accepted_external_ids
 
 
@@ -497,7 +494,7 @@ def test_reject_records_already_filled_out_by_case_investigator():
     )
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    reason = "Case already submitted by a Case Investigator."
+    reason = "Case not found or already submitted by a Case Investigator."
     expected_reject_records = pd.DataFrame(
         {
             "record_id": ["3", "4"],
