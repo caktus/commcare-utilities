@@ -234,7 +234,7 @@ def get_sqlite_conn():
 
 def add_bad_ids(case_type, ids):
     """
-    Adds new bad CommCare IDs to the sqlite3 database.
+    Adds new bad CommCare IDs to the sqlite3 database for the given case_type.
     """
     df = pd.DataFrame({"id": ids, "case_type": case_type})
     df.to_sql(
@@ -244,7 +244,7 @@ def add_bad_ids(case_type, ids):
 
 def get_bad_ids(case_type):
     """
-    Returns a DataFrame with all bad CommCare IDs currently known.
+    Returns a list of all bad CommCare IDs currently known for the given case_type.
     """
     return pd.read_sql(
         f"SELECT DISTINCT id FROM {BAD_PCC_IDS_TABLE_NAME} WHERE case_type = ?",
