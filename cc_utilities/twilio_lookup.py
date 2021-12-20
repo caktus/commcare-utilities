@@ -1,5 +1,7 @@
 import copy
+import sqlite3
 
+import pandas as pd
 import phonenumbers
 import requests
 from phonenumbers import NumberParseException
@@ -20,6 +22,12 @@ from .constants import (
     WHITE_LISTED_TWILIO_CODES,
 )
 from .logger import logger
+
+# State file for the Twilio sync. It can safely be deleted if need
+# (it will be recreated on the next run).
+TWILIO_LOOKUP_STATE_DB_FILE = "twilio_lookup_state.db"
+# Table name for bad CommCare IDs in the Twilio lookup state DB.
+BAD_PCC_IDS_TABLE_NAME = "bad_commcare_ids"
 
 
 class TwilioLookUpError(Exception):
@@ -188,6 +196,7 @@ def get_unprocessed_phone_numbers(db_url, table_name="contact", search_column="i
     wheres = [
         getattr(table.c, COMMCARE_PHONE_FIELD).isnot(None),
         func.length(getattr(table.c, COMMCARE_PHONE_FIELD)) > 0,
+        table.c.id.notin_(get_bad_ids(table_name)),
     ]
     if has_can_sms_column:
         wheres.append(
@@ -206,3 +215,39 @@ def get_unprocessed_phone_numbers(db_url, table_name="contact", search_column="i
         return [dict(row) for row in result.fetchall()]
     finally:
         conn.close()
+
+
+def get_sqlite_conn():
+    """
+    Obtains a connection to a local state file in the form of a sqlite3 database
+    that allows us to keep track of CommCare IDs that don't match existing
+    records in CommCare.
+    """
+    con = sqlite3.connect(TWILIO_LOOKUP_STATE_DB_FILE)
+    cur = con.cursor()
+    cur.execute(
+        f"CREATE TABLE IF NOT EXISTS {BAD_PCC_IDS_TABLE_NAME} (case_type text, id text)"
+    )
+    cur.close()
+    return con
+
+
+def add_bad_ids(case_type, ids):
+    """
+    Adds new bad CommCare IDs to the sqlite3 database.
+    """
+    df = pd.DataFrame({"id": ids, "case_type": case_type})
+    df.to_sql(
+        BAD_PCC_IDS_TABLE_NAME, get_sqlite_conn(), if_exists="append", index=False
+    )
+
+
+def get_bad_ids(case_type):
+    """
+    Returns a DataFrame with all bad CommCare IDs currently known.
+    """
+    return pd.read_sql(
+        f"SELECT DISTINCT id FROM {BAD_PCC_IDS_TABLE_NAME} WHERE case_type = ?",
+        get_sqlite_conn(),
+        params=(case_type,),
+    )["id"].tolist()

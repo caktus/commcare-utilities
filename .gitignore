@@ -16,3 +16,4 @@ __pycache__/
 .idea
 redcap_test.yaml
 .ipynb_checkpoints
+twilio_lookup_state.db
