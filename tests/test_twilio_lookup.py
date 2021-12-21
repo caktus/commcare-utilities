@@ -14,6 +14,8 @@ from cc_utilities.constants import (
 from cc_utilities.twilio_lookup import (
     COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME,
     TWILIO_MOBILE_CODE,
+    add_bad_ids,
+    get_bad_ids,
     process_records,
 )
 
@@ -176,3 +178,15 @@ class TestBulkProcessNumbersCanReceiveSms:
             assert (
                 item[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] == COMMCARE_CANNOT_SMS_LABEL
             )
+
+    def test_bad_ids_state(self):
+        """Bad IDs are set and returned for a the given case_type."""
+        bad_ids = [
+            "ep6GwxUbI2mGBB3JiFWOJ2q0l1kGdsAO",
+            "r9RzBRhrSD8Tz4huHTbJ0AANybm7uMUl",
+            "Nsb5JcTTDN0JrdYWWk99IfScRl0FwwQo",
+        ]
+        add_bad_ids("contact", bad_ids)
+        assert set(get_bad_ids("contact")) == set(bad_ids)
+        # IDs are specific to case_type
+        assert get_bad_ids("other") == []

@@ -4,6 +4,7 @@ from math import ceil
 from cc_utilities.common import chunk_list, upload_data_to_commcare
 from cc_utilities.logger import logger
 from cc_utilities.twilio_lookup import (
+    add_bad_ids,
     cleanup_processed_records_with_numbers,
     get_unprocessed_phone_numbers,
     process_records,
@@ -67,7 +68,7 @@ def main_with_args(
                 f"Uploading SMS capability status for {len(contacts_data)} {case_type}(s) from "
                 f"batch {batch_num} of {expected_batches} to CommCare."
             )
-            upload_data_to_commcare(
+            response_json = upload_data_to_commcare(
                 contacts_data,
                 commcare_project_name,
                 case_type,
@@ -77,6 +78,12 @@ def main_with_args(
                 "off",
                 file_name_prefix="twilio_sms_capability_",
             )
+            if response_json["result"]["match_count"] == 0:
+                # We tried to upload >= 1 record but no matches were found in CommCare.
+                # Record those IDs so we can ignore them later.
+                bad_ids = [r["id"] for r in contacts_data]
+                logger.info(f"Adding bad CommCare IDs to sqlite3 state DB: {bad_ids}")
+                add_bad_ids(case_type, bad_ids)
         else:
             logger.info(
                 f"Skipping upload because there are no {case_type}s "

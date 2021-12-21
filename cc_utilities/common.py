@@ -209,9 +209,9 @@ def upload_data_to_commcare(
         seconds = 2
         logger.info(f"Sleeping {seconds} seconds and checking upload status...")
         time.sleep(seconds)
-        response_ = session.get(response.json()["status_url"])
+        response_json = session.get(response.json()["status_url"]).json()
 
-        if response_.json()["state"] == COMMCARE_UPLOAD_STATES["failed"]:
+        if response_json["state"] == COMMCARE_UPLOAD_STATES["failed"]:
             msg = (
                 f"Something went wrong uploading data to CommCare. Result state was "
                 f"{COMMCARE_UPLOAD_STATES['failed']}"
@@ -219,20 +219,20 @@ def upload_data_to_commcare(
             logger.error(msg)
             raise CommCareUtilitiesError(msg, None)
 
-        if response_.json()["state"] != COMMCARE_UPLOAD_STATES["success"]:
+        if response_json["state"] != COMMCARE_UPLOAD_STATES["success"]:
             logger.info("Upload not ready, will wait")
             continue
 
-        errors = response_.json()["result"]["errors"]
+        errors = response_json["result"]["errors"]
         if (
-            response_.json()["state"] == COMMCARE_UPLOAD_STATES["success"]
+            response_json["state"] == COMMCARE_UPLOAD_STATES["success"]
             and len(errors) == 0
         ):
             logger.info("Successfully uploaded. All done.")
-            break
+            return response_json
 
         if (
-            response_.json()["state"] == COMMCARE_UPLOAD_STATES["success"]
+            response_json["state"] == COMMCARE_UPLOAD_STATES["success"]
             and len(errors) > 0
         ):
             errors_string = ", ".join(

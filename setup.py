@@ -10,17 +10,17 @@ setup(
     license="MIT",
     packages=["cc_utilities", "cc_utilities.command_line"],
     install_requires=[
-        "commcare-export==1.5.0",
+        "commcare-export~=1.7.4",
         "retry",
         "dateparser",
-        "openpyxl==2.5.12",  # commcare-export is pinned to this version
+        "openpyxl~=2.5.12",  # commcare-export is pinned to this version
         "requests",
         "SQLAlchemy",
         "phonenumbers",
         "pandas",
         "pyodbc",
         "pyyaml",
-        "pycap==1.1.2",  # REDCap API
+        "pycap~=1.1.2",  # REDCap API
         "numpy==1.19.3",  # windows env chokes on > than this version
         "xlrd",
     ],
