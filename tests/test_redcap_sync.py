@@ -376,9 +376,9 @@ def test_add_reject_status_columns(patch_datetime_now):
 
 
 @patch("cc_utilities.redcap_sync.import_records_to_redcap")
-@patch("cc_utilities.redcap_sync.query_cdms_for_external_ids_and_dobs")
+@patch("cc_utilities.redcap_sync.query_sql_mirror_by_external_ids_for_col")
 def test_handle_cdms_matching(
-    mock_query_cdms_for_external_ids_and_dobs,
+    mock_query_sql_mirror_by_external_ids_for_col,
     mock_import_records_to_redcap,
     patch_datetime_now,
 ):
@@ -394,7 +394,7 @@ def test_handle_cdms_matching(
         {"cdms_id": "3333", "dob": "2020-01-01"},  # a mismatch on dob
         # one record left out to be ignored by drop_external_ids_not_in_cdms
     ]
-    mock_query_cdms_for_external_ids_and_dobs.return_value = mock_cdms_patients_data
+    mock_query_sql_mirror_by_external_ids_for_col.return_value = mock_cdms_patients_data
 
     input_df = pd.DataFrame(
         {
@@ -438,7 +438,7 @@ def test_handle_cdms_matching(
         redcap_api_key="test",
     )
 
-    mock_query_cdms_for_external_ids_and_dobs.assert_called_once()
+    mock_query_sql_mirror_by_external_ids_for_col.assert_called_once()
     mock_import_records_to_redcap.assert_called_once()
     pd.testing.assert_frame_equal(
         mock_import_records_to_redcap.call_args[0][0], expected_reject_records
@@ -447,10 +447,11 @@ def test_handle_cdms_matching(
 
 
 def test_get_commcare_cases_with_acceptable_interview_dispositions():
+    external_id_col = "cdms_id"
     input_df = pd.DataFrame(
         {
             "record_id": ["1", "2", "3", "4"],
-            "cdms_id": ["1111", "2222", "3333", "4444"],
+            external_id_col: ["1111", "2222", "3333", "4444"],
             "external_id": ["1111", "2222", "3333", "4444"],
             "dob": [None, "1953-03-17", "1933-02-04", None],
             "other_stuff": ["some", "more", "values", None],
@@ -461,23 +462,27 @@ def test_get_commcare_cases_with_acceptable_interview_dispositions():
     case_mocks = [
         [
             {
-                "properties": {
-                    "interview_disposition": ACCEPTED_INTERVIEW_DISPOSITION_VALUES[0]
-                }
-            }
-        ],
-        [{"properties": {"interview_disposition": "unacceptable"}}],
-        [],  # get_commcare_cases returns empty list if not found
-        [{"properties": {"other": ""}}],
+                external_id_col: "1111",
+                "interview_disposition": ACCEPTED_INTERVIEW_DISPOSITION_VALUES[0],
+            },
+            {external_id_col: "2222", "interview_disposition": "unacceptable"},
+            {external_id_col: "4444", "interview_disposition": ""},
+        ]
     ]
     expected_accepted_external_ids = ["1111"]
     with patch(
-        "cc_utilities.redcap_sync.get_commcare_cases", side_effect=case_mocks,
-    ) as mock_get_commcare_cases:
+        "cc_utilities.redcap_sync.query_sql_mirror_by_external_ids_for_col",
+        side_effect=case_mocks,
+    ) as mock_query_sql_mirror_by_external_ids_for_col:
         accepted_external_ids = get_commcare_cases_with_acceptable_interview_dispositions(
-            input_df, "cdms_id", "test_key", "test_user_name", "test_project"
+            input_df,
+            "test",
+            external_id_col,
+            "test_key",
+            "test_user_name",
+            "test_project",
         )
-    assert mock_get_commcare_cases.call_count == len(input_df)
+    assert mock_query_sql_mirror_by_external_ids_for_col.call_count == 1
     assert accepted_external_ids == expected_accepted_external_ids
 
 
@@ -525,6 +530,7 @@ def test_reject_records_already_filled_out_by_case_investigator():
         ) as mock_import_records_to_redcap:
             accepted_records = reject_records_already_filled_out_by_case_investigator(
                 input_df,
+                "test",
                 "cdms_id",
                 "project_slug",
                 "cc_user_name",
