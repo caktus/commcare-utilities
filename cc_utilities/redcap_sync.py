@@ -6,7 +6,7 @@ import pandas as pd
 import redcap
 from sqlalchemy import MetaData, Table, create_engine, select
 
-from .common import get_commcare_cases, upload_data_to_commcare
+from .common import upload_data_to_commcare
 from .constants import (
     ACCEPTED_INTERVIEW_DISPOSITION_VALUES,
     DOB_FIELD,
@@ -169,14 +169,14 @@ def set_external_id_column(df, external_id_col):
     return df
 
 
-def query_cdms_for_external_ids_and_dobs(
-    df, db_url, external_id_col, table_name="patient"
+def query_sql_mirror_by_external_ids_for_col(
+    df, db_url, external_id_col, table_name, column_name
 ):
     """
     Look up records in the SQL Mirror and get CDMS ID and DOB.
     This will be used to reject records that do not match,
-    to avoid overwriting existing patient records with
-    another patient's data.
+    to avoid overwriting existing records with
+    another record's data.
 
     Returns a list of matching rows, as dictionaries with external_id_col values.
     """
@@ -185,14 +185,13 @@ def query_cdms_for_external_ids_and_dobs(
     meta = MetaData(bind=engine)
     table = Table(table_name, meta, autoload=True, autoload_with=engine)
     query = select(
-        [getattr(table.c, external_id_col), getattr(table.c, DOB_FIELD)]
+        [getattr(table.c, external_id_col), getattr(table.c, column_name)]
     ).where(
         getattr(table.c, external_id_col).in_(external_ids),
         getattr(table.c, DOB_FIELD).isnot(None),
         getattr(table.c, DOB_FIELD) != "",
     )
-    cdms_patients_data = pd.read_sql(query, engine).to_dict(orient="records")
-    return cdms_patients_data
+    return pd.read_sql(query, engine).to_dict(orient="records")
 
 
 def drop_external_ids_not_in_cdms(df, external_id_col, cdms_patients_data):
@@ -308,8 +307,8 @@ def handle_cdms_matching(df, db_url, external_id_col, redcap_api_url, redcap_api
     logger.info(
         f"Checking CommCare DB mirror for DOB and ID matches on {len(df.index)} records."
     )
-    cdms_patients_data = query_cdms_for_external_ids_and_dobs(
-        df, db_url, external_id_col
+    cdms_patients_data = query_sql_mirror_by_external_ids_for_col(
+        df, db_url, external_id_col, "patient", DOB_FIELD,
     )
     df = drop_external_ids_not_in_cdms(df, external_id_col, cdms_patients_data)
     matching_ids = get_records_matching_dob(df, external_id_col, cdms_patients_data)
@@ -334,7 +333,7 @@ def handle_cdms_matching(df, db_url, external_id_col, redcap_api_url, redcap_api
 
 
 def get_commcare_cases_with_acceptable_interview_dispositions(
-    df, external_id_col, cc_api_key, cc_user_name, project_slug
+    df, db_url, external_id_col, cc_api_key, cc_user_name, project_slug
 ):
     """
     Look up existing cases in CommCare and compare with accepted interview_disposition
@@ -345,28 +344,29 @@ def get_commcare_cases_with_acceptable_interview_dispositions(
     """
     accepted_external_ids = []
     external_ids = df[external_id_col].to_list()
+    interview_disposition_rows = query_sql_mirror_by_external_ids_for_col(
+        df, db_url, external_id_col, "patient", INTERVIEW_DISPOSITION,
+    )
+    interview_disposition_map = {
+        row[external_id_col]: row[INTERVIEW_DISPOSITION]
+        for row in interview_disposition_rows
+    }
     for ext_id in external_ids:
-        # Get cases in CommCare to compare interview_disposition. Querying
-        # the SQL mirror would be a favorable source of truth for this, but did
-        # not seem to have this column available at the time of implementing this.
-        # In the event no case is found in CommCare, it will NOT be allowed to sync
+        # In the event no case is found in SQL Mirror, it will NOT be allowed to sync
         # since presumably this would create a new record rather than update an
         # existing one anyways.
-        cases = get_commcare_cases(
-            project_slug, cc_user_name, cc_api_key, external_id=ext_id
-        )
-        if cases:
-            case_properties = cases[0].get("properties")
-            interview_disposition = case_properties.get(INTERVIEW_DISPOSITION)
+        if ext_id in interview_disposition_map:
+            interview_disposition = interview_disposition_map[ext_id]
             if interview_disposition in ACCEPTED_INTERVIEW_DISPOSITION_VALUES:
                 accepted_external_ids.append(ext_id)
         else:
-            logger.warning(f"external_id {ext_id} not found in CommCare")
+            logger.warning(f"external_id {ext_id} NOT FOUND in CommCare SQL mirror")
     return accepted_external_ids
 
 
 def reject_records_already_filled_out_by_case_investigator(
     df,
+    db_url,
     external_id_col,
     project_slug,
     cc_user_name,
@@ -384,7 +384,7 @@ def reject_records_already_filled_out_by_case_investigator(
     """
     logger.info("Checking for records already filled out by a Case Investigator...")
     accepted_external_ids = get_commcare_cases_with_acceptable_interview_dispositions(
-        df, external_id_col, cc_api_key, cc_user_name, project_slug
+        df, db_url, external_id_col, cc_api_key, cc_user_name, project_slug
     )
     accept_records, reject_records = split_records_by_accepted_external_ids(
         df, accepted_external_ids, external_id_col
@@ -433,6 +433,7 @@ def upload_complete_records(
             commcare_api_key,
             create_new_cases="off",
             search_field=EXTERNAL_ID,
+            file_name_prefix="redcap_complete_",
         )
 
 
@@ -464,4 +465,5 @@ def upload_incomplete_records(
             commcare_api_key,
             create_new_cases="off",
             search_field=EXTERNAL_ID,
+            file_name_prefix="redcap_incomplete_",
         )

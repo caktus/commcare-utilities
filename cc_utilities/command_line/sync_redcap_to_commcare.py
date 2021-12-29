@@ -130,6 +130,7 @@ def main_with_args(
                 .pipe(set_external_id_column, external_id_col)
                 .pipe(
                     reject_records_already_filled_out_by_case_investigator,
+                    db_url,
                     external_id_col,
                     commcare_project_name,
                     commcare_user_name,
