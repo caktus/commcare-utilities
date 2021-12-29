@@ -433,6 +433,7 @@ def upload_complete_records(
             commcare_api_key,
             create_new_cases="off",
             search_field=EXTERNAL_ID,
+            file_name_prefix="redcap_complete_",
         )
 
 
@@ -464,4 +465,5 @@ def upload_incomplete_records(
             commcare_api_key,
             create_new_cases="off",
             search_field=EXTERNAL_ID,
+            file_name_prefix="redcap_incomplete_",
         )
