@@ -14,6 +14,7 @@ from cc_utilities.redcap_sync import (
     normalize_phone_cols,
     populate_symptom_columns,
     reject_records_already_filled_out_by_case_investigator,
+    rename_fields,
     set_external_id_column,
     split_complete_and_incomplete_records,
     update_successful_records_in_redcap,
@@ -127,6 +128,7 @@ def main_with_args(
                 .pipe(collapse_checkbox_columns)
                 .pipe(normalize_phone_cols, phone_cols)
                 .pipe(collapse_housing_fields)
+                .pipe(rename_fields)
                 .pipe(set_external_id_column, external_id_col)
                 .pipe(
                     reject_records_already_filled_out_by_case_investigator,

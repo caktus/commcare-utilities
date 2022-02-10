@@ -108,6 +108,17 @@ def collapse_housing_fields(df):
     return df
 
 
+def rename_fields(df):
+    """
+    Rename field(s) in REDCap -> CommCare sync.
+    """
+    rename_mapping = {
+        # 2022-02-10: Correct typo in occupation source field name in REDCap survey
+        "occupation_secondary_other": "occupation_primary_other",
+    }
+    return df.rename(columns=rename_mapping)
+
+
 def normalize_phone_cols(df, phone_cols):
     """
     For the given phone number columns, apply normalize_phone_number().
