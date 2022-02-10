@@ -80,6 +80,13 @@ def test_rename_fields():
     pd.testing.assert_frame_equal(expected_output_df, output_df)
 
 
+def test_rename_fields_source_field_absent():
+    input_df = pd.DataFrame({"other": ["first", "second", "third"]})
+    expected_output_df = pd.DataFrame({"other": ["first", "second", "third"]})
+    output_df = rename_fields(input_df)
+    pd.testing.assert_frame_equal(expected_output_df, output_df)
+
+
 def test_normalize_phone_cols():
     input_df = pd.DataFrame(
         {
