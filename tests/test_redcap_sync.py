@@ -25,6 +25,7 @@ from cc_utilities.redcap_sync import (
     normalize_phone_cols,
     populate_symptom_columns,
     reject_records_already_filled_out_by_case_investigator,
+    rename_fields,
     set_external_id_column,
     split_complete_and_incomplete_records,
     split_records_by_accepted_external_ids,
@@ -65,6 +66,24 @@ def test_collapse_checkbox_columns():
         }
     )
     output_df = collapse_checkbox_columns(input_df)
+    pd.testing.assert_frame_equal(expected_output_df, output_df)
+
+
+def test_rename_fields():
+    input_df = pd.DataFrame(
+        {"occupation_secondary_other": ["first", "second", "third"]}
+    )
+    expected_output_df = pd.DataFrame(
+        {"occupation_primary_other": ["first", "second", "third"]}
+    )
+    output_df = rename_fields(input_df)
+    pd.testing.assert_frame_equal(expected_output_df, output_df)
+
+
+def test_rename_fields_source_field_absent():
+    input_df = pd.DataFrame({"other": ["first", "second", "third"]})
+    expected_output_df = pd.DataFrame({"other": ["first", "second", "third"]})
+    output_df = rename_fields(input_df)
     pd.testing.assert_frame_equal(expected_output_df, output_df)
 
 
