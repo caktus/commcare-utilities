@@ -141,6 +141,38 @@ def normalize_phone_cols(df, phone_cols):
     return df
 
 
+def normalize_temperature(temp, low=96.0, high=106.0):
+    try:
+        num = float(temp)
+    except ValueError:
+        return ""
+    if num < low or num > high:
+        return ""
+    return format(num, ".2f")
+
+
+def normalize_temperature_cols(df, temperature_cols):
+    """
+    For the given temperature columns, apply normalize_temperature().
+    """
+    df = df.copy()
+    for col_name in temperature_cols:
+        if col_name in df.columns:
+            df[col_name] = (
+                df[col_name]
+                # Replace N/A values with empty string before normalizing.
+                .fillna("").apply(partial(normalize_temperature))
+            )
+        else:
+            # Don't fail altogether in case of a misconfiguration in the calling
+            # script, but do issue a warning.
+            logger.warning(
+                f'Temperature column "{col_name}" requested to be normalized '
+                "but not found in dataframe."
+            )
+    return df
+
+
 def populate_symptom_columns(df):
     """
     Calculate the 'symptom_count' value and then use it to determine the value

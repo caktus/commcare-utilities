@@ -12,6 +12,7 @@ from cc_utilities.redcap_sync import (
     collapse_housing_fields,
     handle_cdms_matching,
     normalize_phone_cols,
+    normalize_temperature_cols,
     populate_symptom_columns,
     reject_records_already_filled_out_by_case_investigator,
     rename_fields,
@@ -48,6 +49,7 @@ def main_with_args(
     redcap_api_key,
     external_id_col,
     phone_cols,
+    temperature_cols,
     state_file,
     db_url,
     sync_all,
@@ -65,6 +67,7 @@ def main_with_args(
         redcap_api_key (str): The REDCap API key
         external_id_col (str): The name of the column in REDCap that contains the external_id for CommCare
         phone_cols (list): List of phone columns that should be normalized for CommCare
+        temperature_cols (list): List of temperature columns that should be normalized for CommCare
         state_file (str): File path to a local file where state about this sync can be kept
         db_url (str): the db connection URL to query for existing patients.
         sync_all (bool): If set, ignore the date_begin in the state_file and sync all records
@@ -127,6 +130,7 @@ def main_with_args(
                 redcap_records.pipe(populate_symptom_columns)
                 .pipe(collapse_checkbox_columns)
                 .pipe(normalize_phone_cols, phone_cols)
+                .pipe(normalize_temperature_cols, temperature_cols)
                 .pipe(collapse_housing_fields)
                 .pipe(rename_fields)
                 .pipe(set_external_id_column, external_id_col)
@@ -206,6 +210,11 @@ def main():
         help="Space-separated name(s) of phone columns to normalize",
     )
     parser.add_argument(
+        "--temperature-cols",
+        nargs="*",
+        help="Space-separated name(s) of temperature columns to normalize",
+    )
+    parser.add_argument(
         "--state-file",
         help="The path where state should be read and saved",
         required=True,
@@ -229,6 +238,7 @@ def main():
         args.redcap_api_key,
         args.external_id_col,
         args.phone_cols or [],
+        args.temperature_cols or [],
         args.state_file,
         args.db_url,
         args.sync_all,
