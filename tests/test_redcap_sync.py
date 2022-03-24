@@ -23,6 +23,7 @@ from cc_utilities.redcap_sync import (
     get_records_matching_dob,
     handle_cdms_matching,
     normalize_phone_cols,
+    normalize_temperature_cols,
     populate_symptom_columns,
     reject_records_already_filled_out_by_case_investigator,
     rename_fields,
@@ -101,8 +102,44 @@ def test_normalize_phone_cols():
             "phone2": ["(919) 555-1215", "9195551216", float("nan")],
         }
     )
-    # phone3 doesn't exist and shouldn't cause a hard failure
-    output_df = normalize_phone_cols(input_df, ["phone1", "phone3"])
+    # non_existent column shouldn't cause a hard failure
+    output_df = normalize_phone_cols(input_df, ["phone1", "non_existent"])
+    pd.testing.assert_frame_equal(expected_output_df, output_df)
+
+
+def test_normalize_highest_temp_degrees_f():
+    input_df = pd.DataFrame(
+        {
+            "highest_temp_degrees_f": [
+                "102.3355",
+                "95",
+                "106.1",
+                "97",
+                float("nan"),
+                "87adsf",
+                "96",
+                "106",
+            ],
+        }
+    )
+    expected_output_df = pd.DataFrame(
+        {
+            "highest_temp_degrees_f": [
+                "102.34",
+                "",
+                "",
+                "97.00",
+                "",
+                "",
+                "96.00",
+                "106.00",
+            ],
+        }
+    )
+    # non_existent column shouldn't cause a hard failure
+    output_df = normalize_temperature_cols(
+        input_df, ["highest_temp_degrees_f", "non_existent"]
+    )
     pd.testing.assert_frame_equal(expected_output_df, output_df)
 
 
