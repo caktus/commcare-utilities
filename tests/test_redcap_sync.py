@@ -22,6 +22,7 @@ from cc_utilities.redcap_sync import (
     get_commcare_cases_with_acceptable_interview_dispositions,
     get_records_matching_dob,
     handle_cdms_matching,
+    normalize_date_cols,
     normalize_phone_cols,
     normalize_temperature_cols,
     populate_symptom_columns,
@@ -85,6 +86,27 @@ def test_rename_fields_source_field_absent():
     input_df = pd.DataFrame({"other": ["first", "second", "third"]})
     expected_output_df = pd.DataFrame({"other": ["first", "second", "third"]})
     output_df = rename_fields(input_df)
+    pd.testing.assert_frame_equal(expected_output_df, output_df)
+
+
+def test_normalize_date_cols():
+    input_df = pd.DataFrame(
+        {
+            "date1": ["2022-05-15", "2022-05-32", float("nan")],
+            "date2": ["2022-01-16", "2022-03-32", float("nan")],
+        }
+    )
+    # date1 col is normalized, date2 is left as-is
+    expected_output_df = pd.DataFrame(
+        {
+            "date1": pd.Series(
+                [np.datetime64("2022-05-15"), "", ""], dtype="datetime64[ns]"
+            ),
+            "date2": ["2022-01-16", "2022-03-32", float("nan")],
+        }
+    )
+    # non_existent column shouldn't cause a hard failure
+    output_df = normalize_date_cols(input_df, ["date1", "non_existent"])
     pd.testing.assert_frame_equal(expected_output_df, output_df)
 
 
@@ -530,13 +552,15 @@ def test_get_commcare_cases_with_acceptable_interview_dispositions():
         "cc_utilities.redcap_sync.query_sql_mirror_by_external_ids_for_col",
         side_effect=case_mocks,
     ) as mock_query_sql_mirror_by_external_ids_for_col:
-        accepted_external_ids = get_commcare_cases_with_acceptable_interview_dispositions(
-            input_df,
-            "test",
-            external_id_col,
-            "test_key",
-            "test_user_name",
-            "test_project",
+        accepted_external_ids = (
+            get_commcare_cases_with_acceptable_interview_dispositions(
+                input_df,
+                "test",
+                external_id_col,
+                "test_key",
+                "test_user_name",
+                "test_project",
+            )
         )
     assert mock_query_sql_mirror_by_external_ids_for_col.call_count == 1
     assert accepted_external_ids == expected_accepted_external_ids
