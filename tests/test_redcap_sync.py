@@ -94,6 +94,7 @@ def test_normalize_date_cols():
         {
             "date1": ["2022-05-15", "2022-05-32", float("nan")],
             "date2": ["2022-01-16", "2022-03-32", float("nan")],
+            "date3": ["2/1/2019", "2/30/2020", float("nan")],
         }
     )
     # date1 col is normalized, date2 is left as-is
@@ -103,10 +104,13 @@ def test_normalize_date_cols():
                 [np.datetime64("2022-05-15"), "", ""], dtype="datetime64[ns]"
             ),
             "date2": ["2022-01-16", "2022-03-32", float("nan")],
+            "date3": pd.Series(
+                [np.datetime64("2019-02-01"), "", ""], dtype="datetime64[ns]"
+            ),
         }
     )
     # non_existent column shouldn't cause a hard failure
-    output_df = normalize_date_cols(input_df, ["date1", "non_existent"])
+    output_df = normalize_date_cols(input_df, ["date1", "date3", "non_existent"])
     pd.testing.assert_frame_equal(expected_output_df, output_df)
 
 
