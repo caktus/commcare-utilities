@@ -396,7 +396,8 @@ def main():
         "--app-id", help="The ID of the CommCare app", dest="application_id"
     )
     parser.add_argument(
-        "--db-url", help="The URL string of the db to sync to",
+        "--db-url",
+        help="The URL string of the db to sync to",
     )
     parser.add_argument(
         "--case-types",
@@ -425,10 +426,12 @@ def main():
         default=APPLICATION_STRUCTURE_DEFAULT_TIMEOUT,
     )
     parser.add_argument(
-        "--since", help="Optional. Export all data after this date. Format YYYY-MM-DD",
+        "--since",
+        help="Optional. Export all data after this date. Format YYYY-MM-DD",
     )
     parser.add_argument(
-        "--until", help="Optional. Export all up until this date. Format YYYY-MM-DD",
+        "--until",
+        help="Optional. Export all up until this date. Format YYYY-MM-DD",
     )
     parser.add_argument(
         "--batch-size",

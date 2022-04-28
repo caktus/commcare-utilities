@@ -57,7 +57,12 @@ def main_with_args(
         )
         try:
             contacts_data = cleanup_processed_records_with_numbers(
-                process_records(subset, search_column, twilio_sid, twilio_token,)
+                process_records(
+                    subset,
+                    search_column,
+                    twilio_sid,
+                    twilio_token,
+                )
             )
         except Exception as exc:
             logger.error(f"Something unexpected happened: {exc.message}")

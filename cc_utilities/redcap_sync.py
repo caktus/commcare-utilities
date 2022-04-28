@@ -80,7 +80,9 @@ def collapse_checkbox_columns(df):
         # Add new column with the checkbox values collapsed into a single column
         logger.info(f"Adding column {cc_property} to df")
         df[cc_property] = df.apply(
-            get_checkbox_values, args=(source_val_list,), axis=1,
+            get_checkbox_values,
+            args=(source_val_list,),
+            axis=1,
         )
         # Remove the obsolete columns
         redcap_cols = [col for col, _ in source_val_list]
@@ -117,6 +119,24 @@ def rename_fields(df):
         "occupation_secondary_other": "occupation_primary_other",
     }
     return df.rename(columns=rename_mapping)
+
+
+def normalize_date_cols(df, date_cols):
+    """
+    For the given date columns, coerce to datetime and drop invalid values.
+    """
+    df = df.copy()
+    for col_name in date_cols:
+        if col_name in df.columns:
+            df[col_name] = df[col_name].apply(partial(pd.to_datetime, errors="coerce"))
+        else:
+            # Don't fail altogether in case of a misconfiguration in the calling
+            # script, but do issue a warning.
+            logger.warning(
+                f'Date column "{col_name}" requested to be normalized '
+                "but not found in dataframe."
+            )
+    return df
 
 
 def normalize_phone_cols(df, phone_cols):
@@ -319,7 +339,8 @@ def import_records_to_redcap(df, redcap_api_url, redcap_api_key):
     logger.info(f"Updating {len(df.index)} records in REDCap.")
     redcap_project = redcap.Project(redcap_api_url, redcap_api_key)
     response = redcap_project.import_records(
-        to_import=df, overwrite="normal",  # Default, ignores blank values.
+        to_import=df,
+        overwrite="normal",  # Default, ignores blank values.
     )
     logger.info(f"Done updating {response.get('count')} REDCap records.")
     return response
@@ -351,7 +372,11 @@ def handle_cdms_matching(df, db_url, external_id_col, redcap_api_url, redcap_api
         f"Checking CommCare DB mirror for DOB and ID matches on {len(df.index)} records."
     )
     cdms_patients_data = query_sql_mirror_by_external_ids_for_col(
-        df, db_url, external_id_col, "patient", DOB_FIELD,
+        df,
+        db_url,
+        external_id_col,
+        "patient",
+        DOB_FIELD,
     )
     df = drop_external_ids_not_in_cdms(df, external_id_col, cdms_patients_data)
     matching_ids = get_records_matching_dob(df, external_id_col, cdms_patients_data)
@@ -388,7 +413,11 @@ def get_commcare_cases_with_acceptable_interview_dispositions(
     accepted_external_ids = []
     external_ids = df[external_id_col].to_list()
     interview_disposition_rows = query_sql_mirror_by_external_ids_for_col(
-        df, db_url, external_id_col, "patient", INTERVIEW_DISPOSITION,
+        df,
+        db_url,
+        external_id_col,
+        "patient",
+        INTERVIEW_DISPOSITION,
     )
     interview_disposition_map = {
         row[external_id_col]: row[INTERVIEW_DISPOSITION]

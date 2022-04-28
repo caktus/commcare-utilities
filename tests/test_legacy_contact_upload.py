@@ -259,7 +259,10 @@ class TestCaseDataValidationLogic:
         "When given valid col names, `validate_case_data_columns` is True"
         df = pd.DataFrame(make_legacy_contacts_data())
         assert (
-            validate_case_data_columns(df.columns, [col for col in CONTACT_DATA_DICT],)
+            validate_case_data_columns(
+                df.columns,
+                [col for col in CONTACT_DATA_DICT],
+            )
             is True
         )
 
@@ -270,7 +273,10 @@ class TestCaseDataValidationLogic:
             row["uNeXpEcTeD"] = True
         df = pd.DataFrame(data)
         assert (
-            validate_case_data_columns(df.columns, [col for col in CONTACT_DATA_DICT],)
+            validate_case_data_columns(
+                df.columns,
+                [col for col in CONTACT_DATA_DICT],
+            )
             is False
         )
 
@@ -415,7 +421,9 @@ class TestUploadLegacyContactsToCommCare:
 
 
 def test_command_line_script_happy_path(
-    mock_upload_to_commcare, mock_get_commcare_case, mock_get_commcare_cases,
+    mock_upload_to_commcare,
+    mock_get_commcare_case,
+    mock_get_commcare_cases,
 ):
     "Test happy path of the command-line script for uploading legacy contacts"
     data = make_legacy_contacts_data(num=200)

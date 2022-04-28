@@ -11,6 +11,7 @@ from cc_utilities.redcap_sync import (
     collapse_checkbox_columns,
     collapse_housing_fields,
     handle_cdms_matching,
+    normalize_date_cols,
     normalize_phone_cols,
     normalize_temperature_cols,
     populate_symptom_columns,
@@ -50,6 +51,7 @@ def main_with_args(
     external_id_col,
     phone_cols,
     temperature_cols,
+    date_cols,
     state_file,
     db_url,
     sync_all,
@@ -131,6 +133,7 @@ def main_with_args(
                 .pipe(collapse_checkbox_columns)
                 .pipe(normalize_phone_cols, phone_cols)
                 .pipe(normalize_temperature_cols, temperature_cols)
+                .pipe(normalize_date_cols, date_cols)
                 .pipe(collapse_housing_fields)
                 .pipe(rename_fields)
                 .pipe(set_external_id_column, external_id_col)
@@ -185,7 +188,10 @@ def main():
         required=True,
     )
     parser.add_argument(
-        "--api-key", help="A Commcare API key", dest="commcare_api_key", required=True,
+        "--api-key",
+        help="A Commcare API key",
+        dest="commcare_api_key",
+        required=True,
     )
     parser.add_argument(
         "--project",
@@ -194,10 +200,14 @@ def main():
         required=True,
     )
     parser.add_argument(
-        "--redcap-api-url", help="The REDCap API URL", required=True,
+        "--redcap-api-url",
+        help="The REDCap API URL",
+        required=True,
     )
     parser.add_argument(
-        "--redcap-api-key", help="A REDCap API key", required=True,
+        "--redcap-api-key",
+        help="A REDCap API key",
+        required=True,
     )
     parser.add_argument(
         "--external-id-col",
@@ -213,6 +223,11 @@ def main():
         "--temperature-cols",
         nargs="*",
         help="Space-separated name(s) of temperature columns to normalize",
+    )
+    parser.add_argument(
+        "--date-cols",
+        nargs="*",
+        help="Space-separated name(s) of date columns to normalize",
     )
     parser.add_argument(
         "--state-file",
@@ -239,6 +254,7 @@ def main():
         args.external_id_col,
         args.phone_cols or [],
         args.temperature_cols or [],
+        args.date_cols or [],
         args.state_file,
         args.db_url,
         args.sync_all,

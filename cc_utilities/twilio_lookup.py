@@ -64,7 +64,9 @@ def process_records(data, search_column, twilio_sid, twilio_token):
     for record in records:
         if record["standard_formatted_number"] is not None:
             record[COMMCARE_CAN_RECEIVE_SMS_FIELD_NAME] = process_phone_number(
-                record[COMMCARE_PHONE_FIELD], twilio_sid, twilio_token,
+                record[COMMCARE_PHONE_FIELD],
+                twilio_sid,
+                twilio_token,
             )
 
     return records
@@ -108,7 +110,10 @@ def twilio_http_request(method, url, sid, auth_token):
         session.mount("https://", adapter)
         session.mount("http://", adapter)
         return session.request(
-            method, url, auth=(sid, auth_token), params={"Type": "carrier"},
+            method,
+            url,
+            auth=(sid, auth_token),
+            params={"Type": "carrier"},
         )
 
 

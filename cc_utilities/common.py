@@ -56,7 +56,7 @@ def get_application_structure(
         request_timeout if request_timeout else APPLICATION_STRUCTURE_DEFAULT_TIMEOUT
     )
     url = urljoin(APPLICATION_STRUCTURE_URL.format(project_slug), app_id)
-    data = dict(format="json",)
+    data = dict(format="json")
     headers = {
         "Authorization": f"ApiKey {cc_username}:{cc_api_key}",
     }
