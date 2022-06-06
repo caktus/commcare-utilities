@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<message>
+    <NewStatement>
+        <CASE_ID>101012345</CASE_ID>
+        <BIRTH_DATE>1981-02-13</BIRTH_DATE>
+        <FIRST_NAME>Jane</FIRST_NAME>
+        <LAST_NAME>Doe</LAST_NAME>
+        <STREET1>123 S 4th St 4th Fl</STREET1>
+        <STREET2 null="yes"/>
+        <POSTAL_CODE>19147</POSTAL_CODE>
+        <CITY>Philadelphia</CITY>
+        <STATE>PA</STATE>
+        <HOME_PHONE>(999) 999-9999</HOME_PHONE>
+        <MOBILE_PHONE null="yes"/>
+        <EMAIL null="yes"/>
+        <GENDER>Male</GENDER>
+        <RACE null="yes"/>
+        <RESULT>Positive</RESULT>
+        <TEST>SARS coronavirus 2 RNA</TEST>
+        <RESULT_VALUE null="yes"/>
+        <SPECIMEN_DATE>2022-03-29</SPECIMEN_DATE>
+        <FACILITY__OTHER>HUP Hospital of the </FACILITY__OTHER>
+        <UNID>4349848821</UNID>
+        <AGE_YEARS>40.6603</AGE_YEARS>
+        <HISPANIC null="yes"/>
+        <RESULT_DATE>2022-03-29</RESULT_DATE>
+        <FACILITY>HOSP UNIV OF PENN LAB,PENN-HUP-LAB,3400 SPRUCE ST,PHILADELPHIA,PA,19104,215-662-3406,LB6005</FACILITY>
+        <ORDER_FACILITY>HOSP UNIV OF PENN LAB,PENN-HUP-LAB,3400 SPRUCE ST,PHILADELPHIA,PA,19104,215-662-3406,LB6005</ORDER_FACILITY>
+        <ORDER_PROVIDER>Jan, Shelly</ORDER_PROVIDER>
+        <CREATE_DATE>2022-03-31</CREATE_DATE>
+        <COMMCARE_ID null="yes"/>
+        <identifier>297000</identifier>
+    </NewStatement>
+</message>

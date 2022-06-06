@@ -1,3 +1,32 @@
+from enum import Enum
+from pathlib import Path
+
+
+class FacilityTypes(Enum):
+    LAB = "lab"
+    ORDERING = "ordering"
+
+    def __str__(self):
+        return self.value[0]
+
+
+class CaseTypes(Enum):
+    PATIENT = ("patient",)
+    LAB_RESULT = ("lab_result",)
+
+    def __str__(self):
+        return self.value[0]
+
+    def __eq__(self, other):
+        return self.value[0] == other
+
+
+CC_UTILITIES_BASE = Path(__file__).parent.resolve()
+DB_NAME = Path(
+    CC_UTILITIES_BASE, "pcc_remapper/database/cdms_message_queue.db"
+).absolute()
+COMMCARE_TEST_SLUG = "philly-covid19-intqa"
+COMMCARE_PROD_SLUG = "philly-covid-containment"
 BULK_UPLOAD_URL = "https://www.commcarehq.org/a/{}/importer/excel/bulk_upload_api/"
 LIST_CASES_URL = "https://www.commcarehq.org/a/{}/api/v0.5/case/"
 CASE_REPORT_URL = "https://www.commcarehq.org/a/{}/reports/case_data/"
@@ -89,3 +118,112 @@ REDCAP_INTEGRATION_STATUS_TIMESTAMP = "integration_status_timestamp"
 REDCAP_INTEGRATION_STATUS_REASON = "integration_status_reason"
 
 EXTERNAL_ID = "external_id"
+
+
+# PCC REMAPPER CONSTANTS
+DATE_TIME_FORMATS = ["%Y-%m-%d %H:%M:%S.%f"]
+DATE_FORMATS = ["%Y-%m-%d"]
+
+# Replacement constants or choices
+
+TEST_RESULTS_CONFIRMED = [
+    "SARS-CoV-2, NAA",
+    "SARS coronavirus 2 RNA",
+    "SARS coronavirus RNA [Presence] in Unspecified specimen by NAA with probe detection",
+    "SARS-CoV-2 N gene Resp Ql NAA+probe",
+    "SARS coronavirus 2 (Rapid) RdRp gene [Presence] in Respiratory specimen by NAA with probe detection",
+    "SARS-CoV-2 (COVID-19) ORF1ab region NAA+probe Ql (Resp)",
+    "SARS-COV-2 (COVID-19) RNA [PRESENCE] IN NASOPHARYNX BY NAA WITH PROBE DETECTION",
+    "SARS-CoV-2 RNA Sal Ql NAA+probe",
+]
+
+TEST_RESULTS_PROBABLE = [
+    "SARS-CoV-2 (COVID-19) Ag [Presence] in Respiratory specimen by Rapid immunoassay",
+    "SARS-CoV+SARS-CoV-2 Ag Resp Ql IA.rapid",
+]
+
+TEST_RESULTS_NO_SEND = ["SARS coronavirus 2 Ab.IgM", "SARS coronavirus 2 Ab.IgA"]
+RESULT_VALUES_SEND = ["Positive", "Presumptive Positive", "Detected"]
+
+RACE_MAP = {
+    "African American|African": "black",
+    "White": "white",
+    "Other": "other",
+    "Asian": "asian",
+    "Pacific Islander": "hawaiian_pi",
+    "Native American": "amer_indian_alaskan",
+    "Unknown": "unknown",
+}
+
+GENDER_MAP = {"Male": "male", "Female": "female"}
+
+TEST_RESULTS_ALL_MAP = {
+    "SARS-CoV-2, NAA": "sars_cov_2_naa",
+    "SARS coronavirus 2 RNA": "sars_coronavirus_2_rna",
+    "SARS coronavirus 2 Ab.IgM": "sars_coronavirus_2_abigm",
+    "SARS coronavirus RNA [Presence] in Unspecified specimen by NAA with probe detection": "sars_coronavirus_2_rdrpgene_in_unspecified_specimen",
+    "SARS coronavirus 2 Ab.IgA": "sars_coronavirus_2_abiga",
+    "SARS coronavirus 2 (Rapid) RdRp gene [Presence] in Respiratory specimen by NAA with probe detection": "sars_coronavirus_2_rdrpgene_in_respiratory_specimen",
+    "SARS-CoV-2 RNA Sal Ql NAA+probe": "pcr_saliva_rna_naa",
+    "SARS-CoV-2 N gene Resp Ql NAA+probe": "pcr_qi_naa",
+    "SARS-CoV-2 N gene Sal Ql NAA+probe": "pcr_saliva_qi_naa",
+    "SARS-COV-2 (COVID-19) RNA [PRESENCE] IN NASOPHARYNX BY NAA WITH PROBE DETECTION": "pcr_rna_np_naa",
+    "SARS-CoV-2 (COVID-19) Ag [Presence] in Respiratory specimen by Rapid immunoassay": "antigen_ag_resp_rapid_immuno",
+    "SARS-CoV-2 (COVID-19) ORF1ab region NAA+probe Ql (Resp)": "pcr_orf1ab",
+    "SARS-CoV+SARS-CoV-2 Ag Resp Ql IA.rapid": "antigen_qi_ia_rapid",
+    "QPCR (RUTGERSTAQPATHSARS-COV-2-ASSAY)": "pcrq_rutgers",
+    "Other": "other",
+}
+
+PATIENT_HEADERS = [
+    "external_id",
+    "cdms_id",
+    "owner_name",
+    "disease_status",
+    "name",
+    "full_name",
+    "age",
+    "address",
+    "address_complete",
+    "address_street",
+    "address_city",
+    "address_county",
+    "address_state",
+    "address_zip",
+    "specimen_collection_date",
+    "analysis_date",
+    "close_base_date",
+    "interview_initiated",
+    "interview_disposition",
+    "patient_type",
+    "dob",
+    "dob_known",
+    "ethnicity",
+    "race",
+    "gender",
+    "first_name",
+    "last_name",
+    "phone_home",
+    "contact_phone_number",
+    "has_phone",
+    "current_status",
+    "case_import_date",
+]
+
+LAB_HEADERS = [
+    "parent_external_id",
+    "parent_type",
+    "parent_relationship_type",
+    "parent_identifier",
+    "external_id",
+    "name",
+    "cdms_id",
+    "cdms_create_date",
+    "specimen_collection_date",
+    "analysis_date",
+    "lab_facility",
+    "ordering_facility",
+    "ordering_provider",
+    "lab_result",
+    "test_type",
+]

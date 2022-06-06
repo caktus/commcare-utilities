@@ -8,7 +8,7 @@ setup(
     author="Caktus Consulting Group, LLC",
     author_email="team@caktusgroup.com",
     license="MIT",
-    packages=["cc_utilities", "cc_utilities.command_line"],
+    packages=["cc_utilities", "cc_utilities.command_line", "cc_utilities.pcc_remapper"],
     install_requires=[
         "commcare-export~=1.7.4",
         "retry",
@@ -23,6 +23,8 @@ setup(
         "pycap~=1.1.2",  # REDCap API
         "numpy==1.19.3",  # windows env chokes on > than this version
         "xlrd",
+        "beautifulsoup4==4.10.0",
+        "requests==2.25.1",
     ],
     entry_points={
         "console_scripts": [
