@@ -12,7 +12,10 @@ Note that this guide does not cover all possible configurations on Windows or th
 ## Setup, configuration and first run
 
 1. **Install and configure Python**: If you don't already have Python 3 installed on your system, you'l need to take care of that first. Additionally, you may consider using [pyenv-win](https://github.com/pyenv-win/pyenv-win) if you have a need for having multiple Python versions in the environment in which you'll be running this code.
-2. **Get the `commcare-utilities` Python package**: Clone [the `commcare-utilities` repo](https://github.com/caktus/commcare-utilities) to the computer that will run the script. Note that if you're installing this script in an environment that does not have open internet access or otherwise cannot access PyPI to download depedencies, you'll need to pre-download the dependencies for this repo. We won't cover that in detail in this guide, but [here is one good solution](https://stackoverflow.com/a/53625778/1264950). Also, note that if you can't run Git, you can download `commcare-utilities` as a Zip file from the repo page.
+2. **Get the `commcare-utilities` Python package**: Clone [the `commcare-utilities` repo](https://github.com/caktus/commcare-utilities) to the computer that will run the script.
+   Note that if you're installing this script in an environment that does not have open internet access or otherwise cannot access PyPI to download depedencies,
+   you'll need to pre-download the dependencies for this repo. We won't cover that in detail in this guide,
+   but [here is one good solution](https://stackoverflow.com/a/53625778/1264950). Also, note that if you can't run Git, you can download `commcare-utilities` as a Zip file from the repo page.
 3. **Create and activate a virtual environment**: From a command line environment on the machine that will be running the script, navigate into the `commcare-utilities` folder. Verify that you're using Python 3, then create a virtual environment by running the following command (substituting in the appropriate value for the path to virtual environment portion -- you'll probably want put this in the root of the commcare-utilities folder):
 
     ```bash
