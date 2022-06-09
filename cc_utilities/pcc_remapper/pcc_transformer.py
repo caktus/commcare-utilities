@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 from bs4 import BeautifulSoup
-from database.models import PccDBRecord
+from database.classes import PccDBRecord
 
 if __name__ == "__main__":
     from cc_utilities.pcc_remapper.tests.message_factory import (
@@ -18,7 +18,7 @@ if __name__ == "__main__":
         soup = ""
         with FAKED_MESSAGES_FILE.open("r") as fh:
             soup = BeautifulSoup(fh.read(), "html.parser")
-        # FAKED_MESSAGES_FILE.unlink()
+        FAKED_MESSAGES_FILE.unlink()
         recorder = PccDBRecord(soup=soup)
         recorder.write_each()
     else:

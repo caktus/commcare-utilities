@@ -7,7 +7,7 @@ from faker import Faker
 from cc_utilities import constants
 
 fake = Faker()
-Faker.seed(random.choice([18274987, 2878, 897238]))
+Faker.seed(random.randint(1, 100000000))
 
 FAKED_MESSAGES_FILE = Path("faked_messages.xml")
 

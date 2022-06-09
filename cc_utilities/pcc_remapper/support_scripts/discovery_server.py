@@ -1,26 +1,9 @@
 # This is a simple HTTP server to accept connections from a Rhapsody REST Client
 import argparse
-import logging
-import sys
 from wsgiref.simple_server import make_server
 
-from cc_utilities.pcc_remapper.database.models import PccDBRecord
-
-# FIXME: Use main logger configuration if/when merged with the rest of the repo
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-CONSOLE_LOGGER_LEVEL = "INFO"
-FILE_LOGGER_LEVEL = "INFO"
-
-console_logger = logging.StreamHandler(sys.stdout)
-console_logger.setLevel(logging.DEBUG)
-console_logger.setFormatter(formatter)
-
-logger = logging.getLogger()
-logger.setLevel(getattr(logging, CONSOLE_LOGGER_LEVEL))
-logger.addHandler(console_logger)
-
-logger = logging.getLogger(__file__)
+from cc_utilities.logger import logger
+from cc_utilities.pcc_remapper.database.classes import PccDBRecord
 
 
 def generate_response(start_response, status, response_body):
