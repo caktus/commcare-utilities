@@ -35,6 +35,7 @@ setup(
             "sync-commcare-app-to-db=cc_utilities.command_line.sync_commcare_app_to_db:main",
             "easy-bulk-upload-contacts=cc_utilities.command_line.user_friendly_bulk_contact_upload:main",
             "sync-redcap-to-commcare=cc_utilities.command_line.sync_redcap_to_commcare:main",
+            "xml_receiver=cc_utilities.pcc_remapper.support_scripts.xml_receiver:main",
         ]
     },
     zip_safe=False,
