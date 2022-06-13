@@ -13,19 +13,19 @@ setup(
         "commcare-export~=1.8.1",
         "retry",
         "dateparser",
-        "openpyxl~=2.5.12",  # commcare-export is pinned to this version
+        "openpyxl",  # commcare-export is pinned to this version
         "requests",
         "SQLAlchemy",
         "phonenumbers",
         "pandas",
         "pyodbc",
         "pyyaml",
-        "pycap~=1.1.2",  # REDCap API
+        "pycap",  # REDCap API
         "numpy==1.19.3",  # windows env chokes on > than this version
         "xlrd",
         "peewee==3.14.10",
-        "beautifulsoup4==4.10.0",
-        "requests==2.25.1",
+        "beautifulsoup4",
+        "requests",
     ],
     entry_points={
         "console_scripts": [
