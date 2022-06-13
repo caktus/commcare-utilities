@@ -10,6 +10,7 @@ setup(
     license="MIT",
     packages=["cc_utilities", "cc_utilities.command_line", "cc_utilities.pcc_remapper"],
     install_requires=[
+        "wheel",
         "commcare-export~=1.8.1",
         "retry",
         "dateparser",
