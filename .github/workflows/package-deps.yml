@@ -56,17 +56,14 @@ jobs:
           cd ${{ matrix.os }}-deps/
           pip freeze | grep -v commcare-utilities > requirements.txt
           pip download -r requirements.txt
-      - name: Get the version
-        id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
       - name: Zip dependencies
         if: "!contains(matrix.os, 'windows')"
         run: |
-          zip -r ${{ matrix.os }}-${{ steps.get_version.outputs.VERSION }}-deps.zip ${{ matrix.os }}-deps/
+          zip -r ${{ matrix.os }}-deps.zip ${{ matrix.os }}-deps/
       - name: Zip dependencies
         if: contains(matrix.os, 'windows')
         run: |
-          powershell Compress-Archive ${{ matrix.os }}-deps/ ${{ matrix.os }}-${{ steps.get_version.outputs.VERSION }}-deps.zip
+          powershell Compress-Archive ${{ matrix.os }}-deps/ ${{ matrix.os }}-deps.zip
       - name: Load Release URL File from release job
         uses: actions/download-artifact@v1
         with:
