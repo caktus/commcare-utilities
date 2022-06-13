@@ -10,7 +10,7 @@ setup(
     license="MIT",
     packages=["cc_utilities", "cc_utilities.command_line", "cc_utilities.pcc_remapper"],
     install_requires=[
-        "commcare-export~=1.7.4",
+        "commcare-export~=1.8.1",
         "retry",
         "dateparser",
         "openpyxl~=2.5.12",  # commcare-export is pinned to this version
