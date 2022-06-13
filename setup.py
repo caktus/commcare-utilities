@@ -24,6 +24,7 @@ setup(
         "numpy==1.19.3",  # windows env chokes on > than this version
         "xlrd",
         "peewee==3.14.10",
+        "faker",
         "beautifulsoup4",
         "requests",
     ],

@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from database.classes import PccDBRecord
 
 if __name__ == "__main__":
-    from cc_utilities.pcc_remapper.tests.message_factory import (
+    from cc_utilities.pcc_remapper.factories.message_factory import (
         FAKED_MESSAGES_FILE,
         generate_message_file,
     )
@@ -23,8 +23,8 @@ if __name__ == "__main__":
         recorder.write_each()
     else:
         print("Logging messages")
-        patients_csv = Path("tests/patients.csv")
-        labs_csv = Path("tests/labs.csv")
+        patients_csv = Path("factories/patients.csv")
+        labs_csv = Path("factories/labs.csv")
         recorder = PccDBRecord()
         patients, labs = recorder.messages_to_csv()
         with patients_csv.open("w", encoding="utf-8") as fh:

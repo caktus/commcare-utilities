@@ -74,7 +74,9 @@ class CommCareConnect:
 
 
 if __name__ == "__main__":
-    from cc_utilities.pcc_remapper.tests.message_factory import generate_message_file
+    from cc_utilities.pcc_remapper.factories.message_factory import (
+        generate_message_file,
+    )
 
     generate_message_file()
     cc = CommCareConnect()
