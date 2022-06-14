@@ -14,18 +14,20 @@ from peewee import (
 )
 
 from cc_utilities import constants
+from cc_utilities.logger import logger
 
 
 class DatabaseConnection:
     PCC_REMAPPER_DB = SqliteDatabase(constants.DB_NAME)
 
     def __init__(self) -> None:
-        print("Connecting to database")
+        logger.info("Connecting to database")
+        logger.info(f"DB_LOCATION: {constants.DB_NAME}")
         self.PCC_REMAPPER_DB.connect()
         self.PCC_REMAPPER_DB.create_tables([BaseMessage, Message])
 
     def close(self):
-        print("Disconnecting from the database")
+        logger.info("Disconnecting from the database")
         self.PCC_REMAPPER_DB.close()
 
 
