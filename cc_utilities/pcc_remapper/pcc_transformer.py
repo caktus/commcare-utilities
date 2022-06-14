@@ -2,13 +2,11 @@ import sys
 from pathlib import Path
 
 from bs4 import BeautifulSoup
-from database.classes import PccDBRecord
+
+from .database.classes import PccDBRecord
 
 if __name__ == "__main__":
-    from cc_utilities.pcc_remapper.factories.message_factory import (
-        FAKED_MESSAGES_FILE,
-        generate_message_file,
-    )
+    from .factories.message_factory import FAKED_MESSAGES_FILE, generate_message_file
 
     num_messages = sys.argv[1]
     read = sys.argv[2]

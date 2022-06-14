@@ -8,7 +8,15 @@ setup(
     author="Caktus Consulting Group, LLC",
     author_email="team@caktusgroup.com",
     license="MIT",
-    packages=["cc_utilities", "cc_utilities.command_line", "cc_utilities.pcc_remapper"],
+    packages=[
+        "cc_utilities",
+        "cc_utilities.command_line",
+        "cc_utilities.pcc_remapper",
+        "cc_utilities.pcc_remapper.data_objects",
+        "cc_utilities.pcc_remapper.database",
+        "cc_utilities.pcc_remapper.factories",
+        "cc_utilities.pcc_remapper.support_scripts",
+    ],
     install_requires=[
         "commcare-export~=1.8.1",
         "retry",
