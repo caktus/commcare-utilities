@@ -31,7 +31,7 @@ class PccDBRecord(DatabaseConnection):
 
     def _prep_records(self):
         if not self.soup:
-            self.soup = BeautifulSoup(self.raw)
+            self.soup = BeautifulSoup(self.raw, parser="html5")
         self.messages = self.soup.find_all("newstatement")
         self.message_count = len(self.messages)
 
