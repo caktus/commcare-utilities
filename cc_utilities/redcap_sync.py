@@ -6,7 +6,7 @@ import pandas as pd
 import redcap
 from sqlalchemy import MetaData, Table, create_engine, select
 
-from .common import upload_data_to_commcare
+from .common import CommCareUtilitiesError, upload_data_to_commcare
 from .constants import (
     ACCEPTED_INTERVIEW_DISPOSITION_VALUES,
     DOB_FIELD,
@@ -528,14 +528,19 @@ def upload_incomplete_records(
         # and converts it back to a DataFrame.
         # **Note that iterrows does not preserve the type of a cell.
         data = row.dropna().to_frame().transpose()
-        upload_data_to_commcare(
-            data,
-            commcare_project_name,
-            "patient",
-            EXTERNAL_ID,
-            commcare_user_name,
-            commcare_api_key,
-            create_new_cases="off",
-            search_field=EXTERNAL_ID,
-            file_name_prefix="redcap_incomplete_",
-        )
+        try:
+            upload_data_to_commcare(
+                data,
+                commcare_project_name,
+                "patient",
+                EXTERNAL_ID,
+                commcare_user_name,
+                commcare_api_key,
+                create_new_cases="off",
+                search_field=EXTERNAL_ID,
+                file_name_prefix="redcap_incomplete_",
+            )
+        except CommCareUtilitiesError:
+            logger.exception(
+                f"Failed to sync data for external ID {data[EXTERNAL_ID]}; ignoring."
+            )
